@@ -1,0 +1,33 @@
+sources:
+  cafef_stock:
+    enabled: true
+    name: CafeF - Thi truong chung khoan
+    region: VN
+    language: vi
+    discovery: rss
+    feed_url: https://cafef.vn/thi-truong-chung-khoan.rss
+    max_items: 8
+    enrich_article: true
+    renderer: crawl4ai
+
+  vnexpress_business:
+    enabled: true
+    name: VnExpress - Kinh doanh
+    region: VN
+    language: vi
+    discovery: rss
+    feed_url: https://vnexpress.net/rss/kinh-doanh.rss
+    max_items: 8
+    enrich_article: true
+    renderer: crawl4ai
+
+  investing_stock_market:
+    enabled: true
+    name: Investing.com - Stock Market News
+    region: GLOBAL
+    language: en
+    discovery: rss
+    feed_url: https://www.investing.com/rss/news_25.rss
+    max_items: 8
+    enrich_article: true
+    renderer: crawl4ai

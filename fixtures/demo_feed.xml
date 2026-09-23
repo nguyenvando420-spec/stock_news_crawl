@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<rss version="2.0">
+  <channel>
+    <title>Demo Finance Feed</title>
+    <link>https://example.com/finance</link>
+    <description>Offline smoke test fixture</description>
+    <item>
+      <title>Demo: Market closes higher</title>
+      <link>https://example.com/article-1</link>
+      <description>A local fixture used to validate feed parsing.</description>
+      <pubDate>Wed, 23 Sep 2026 08:00:00 +0700</pubDate>
+      <guid>demo-1</guid>
+    </item>
+  </channel>
+</rss>

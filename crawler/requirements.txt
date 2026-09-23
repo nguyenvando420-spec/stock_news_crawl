@@ -1,0 +1,7 @@
+Scrapy==2.13.3
+Twisted[tls]==24.11.0
+feedparser==6.0.12
+httpx==0.28.1
+PyYAML==6.0.2
+psycopg[binary]==3.2.10
+python-dateutil==2.9.0.post0

@@ -1,0 +1,58 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: stock-news-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-crawler}
+      POSTGRES_USER: ${POSTGRES_USER:-crawler}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-crawler_password}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-crawler} -d ${POSTGRES_DB:-crawler}"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  crawl4ai:
+    image: unclecode/crawl4ai:0.8.6
+    container_name: stock-news-crawl4ai
+    restart: unless-stopped
+    shm_size: "1gb"
+    environment:
+      CRAWL4AI_API_TOKEN: ${CRAWL4AI_API_TOKEN}
+    ports:
+      - "11235:11235"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:11235/health', timeout=3).read()"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 20s
+
+  crawler:
+    build:
+      context: ./crawler
+    container_name: stock-news-crawler
+    working_dir: /app
+    environment:
+      DATABASE_URL: ${DATABASE_URL:-postgresql://crawler:crawler_password@postgres:5432/crawler}
+      CRAWL4AI_URL: ${CRAWL4AI_URL:-http://crawl4ai:11235}
+      CRAWL4AI_API_TOKEN: ${CRAWL4AI_API_TOKEN}
+      ENABLE_POSTGRES: ${ENABLE_POSTGRES:-true}
+      OUTPUT_FILE: ${OUTPUT_FILE:-/data/articles.jsonl}
+      SOURCES_FILE: /config/sources.yaml
+    volumes:
+      - ./config:/config:ro
+      - ./output:/data
+    depends_on:
+      postgres:
+        condition: service_healthy
+      crawl4ai:
+        condition: service_healthy
+    profiles: ["run"]
+
+volumes:
+  postgres_data:
