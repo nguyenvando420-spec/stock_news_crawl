@@ -1,5 +1,6 @@
 import json
 import os
+import re
 import time
 from typing import Any
 
@@ -47,6 +48,28 @@ class Crawl4AIMiddleware:
         return deferToThread(self._crawl, request, spider)
 
     def _crawl(self, request, spider):
+        source_cfg = request.meta.get("source_cfg") or {}
+        selectors = source_cfg.get("selectors") or {}
+
+        wait_until = source_cfg.get("wait_until", "domcontentloaded")
+        delay_html = float(source_cfg.get("delay_before_return_html", 0.5))
+        wait_for = source_cfg.get("wait_for")
+
+        crawler_params = {
+            "stream": False,
+            "cache_mode": "bypass",
+            "wait_until": wait_until,
+            "delay_before_return_html": delay_html,
+            "page_timeout": 30000,
+            "magic": True,
+            "simulate_user": True,
+            "override_navigator": True,
+            "remove_overlay_elements": True,
+            "excluded_tags": ["nav", "footer", "aside", "script", "style", "noscript", "iframe", "form"],
+        }
+        if wait_for:
+            crawler_params["wait_for"] = wait_for
+
         payload = {
             "urls": [request.url],
             "browser_config": {
@@ -54,16 +77,14 @@ class Crawl4AIMiddleware:
                 "params": {
                     "headless": True,
                     "verbose": False,
+                    "user_agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+                    "viewport_width": 1440,
+                    "viewport_height": 900,
                 },
             },
             "crawler_config": {
                 "type": "CrawlerRunConfig",
-                "params": {
-                    "stream": False,
-                    "cache_mode": "bypass",
-                    "wait_until": "domcontentloaded",
-                    "page_timeout": 30000,
-                },
+                "params": crawler_params,
             },
         }
 
@@ -89,6 +110,19 @@ class Crawl4AIMiddleware:
                 if attempt == 2:
                     spider.logger.warning("Crawl4AI failed for %s: %s", request.url, exc)
                     request.meta["crawl4ai_error"] = repr(exc)
+                    # Attempt CDP bypass on error
+                    from crawler.cdp import is_cdp_available, fetch_via_cdp
+                    if is_cdp_available():
+                        spider.logger.info("Attempting CDP fallback for failed Crawl4AI request: %s", request.url)
+                        cdp_html = fetch_via_cdp(request.url, timeout=18)
+                        if cdp_html:
+                            return HtmlResponse(
+                                url=request.url,
+                                request=request,
+                                status=200,
+                                body=cdp_html.encode("utf-8", errors="replace"),
+                                encoding="utf-8",
+                            )
                     return HtmlResponse(
                         url=request.url,
                         request=request,
@@ -103,11 +137,26 @@ class Crawl4AIMiddleware:
         request.meta["crawl4ai_raw"] = data
 
         html = (
-            result.get("cleaned_html")
-            or result.get("html")
+            result.get("html")
+            or result.get("cleaned_html")
             or result.get("fit_html")
             or ""
         )
+
+        from crawler.extractor import is_cloudflare_challenge
+        is_empty_or_challenge = (
+            is_cloudflare_challenge(html)
+            or len(html.strip()) < 150
+            or ("crawl4ai-result" in html and len(html.strip()) < 200)
+        )
+        if is_empty_or_challenge:
+            spider.logger.warning("Empty or Cloudflare challenge page returned by Crawl4AI for %s", request.url)
+            from crawler.cdp import is_cdp_available, fetch_via_cdp
+            if is_cdp_available():
+                spider.logger.info("Bypassing Cloudflare challenge via CDP for %s", request.url)
+                cdp_html = fetch_via_cdp(request.url, timeout=18)
+                if cdp_html and not is_cloudflare_challenge(cdp_html):
+                    html = cdp_html
 
         return HtmlResponse(
             url=result.get("url") or request.url,

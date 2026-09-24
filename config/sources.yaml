@@ -1,33 +1,737 @@
 sources:
+  # ==============================================================================
+  # CẤU HÌNH DOM SELECTORS CHO TỪNG WEBSITE:
+  #   selectors:
+  #     title:       Selector tiêu đề (vd: "h1.title::text, h1::text")
+  #     description: Selector tóm tắt/sapo (vd: ".sapo::text, p.description::text")
+  #     content:     Selector khung bài viết (vd: ".contentdetail, article.fck_detail")
+  #     author:      Selector tác giả (vd: ".author::text, p.author::text")
+  #     remove:      Selector các phần tử rác cần xóa (quảng cáo, bài liên quan, tag)
+  #
+  # * Nếu không khai báo `selectors`, hệ thống tự dùng Smart Fallback để lọc sạch rác.
+  # ==============================================================================
+
+  # =========================
+  # VIET NAM
+  # =========================
   cafef_stock:
     enabled: true
     name: CafeF - Thi truong chung khoan
     region: VN
+    country: VN
     language: vi
+    category: stocks
     discovery: rss
     feed_url: https://cafef.vn/thi-truong-chung-khoan.rss
-    max_items: 8
+    max_items: 5
     enrich_article: true
     renderer: crawl4ai
+    selectors:
+      title: "h1.title::text, h1::text"
+      description: ".sapo::text"
+      content: ".detail-content.afcbc-body, .contentdetail"
+      author: ".author::text, .source::text"
+      remove: ".tindnd, .relate-container, .link-content-footer, .box-category, .ad-banner, .social-share, .tags, .bottom-info, .btn_chiase, .v2-news-detail-comment"
 
   vnexpress_business:
     enabled: true
     name: VnExpress - Kinh doanh
     region: VN
+    country: VN
     language: vi
+    category: business
     discovery: rss
     feed_url: https://vnexpress.net/rss/kinh-doanh.rss
-    max_items: 8
+    max_items: 5
+    enrich_article: true
+    renderer: crawl4ai
+    selectors:
+      title: "h1.title-detail::text, h1::text"
+      description: "p.description::text"
+      content: "article.fck_detail, .fck_detail"
+      author: "p.author::text, p.Normal strong::text"
+      remove: ".box-category, .box-tuyendung, .banner-ads, .list-news-related, .comment, .social-pin"
+
+  vneconomy_stocks:
+    enabled: true
+    name: VnEconomy - Chung khoan
+    region: VN
+    country: VN
+    language: vi
+    category: stocks
+    discovery: rss
+    feed_url: https://vneconomy.vn/chung-khoan.rss
+    max_items: 5
+    enrich_article: true
+    renderer: crawl4ai
+    selectors:
+      title: "h1.detail__title::text, h1::text"
+      description: ".detail__summary::text"
+      content: ".detail__content"
+      author: ".detail__author::text"
+      remove: ".detail__relate, .banner, .box-category, .social-share"
+
+  vietstock_stocks:
+    enabled: true
+    name: Vietstock - Stocks
+    region: VN
+    country: VN
+    language: en
+    category: stocks
+    discovery: rss
+    feed_url: https://en.vietstock.vn/36/vietnam-stocks.rss
+    max_items: 5
+    enrich_article: true
+    renderer: crawl4ai
+    selectors:
+      title: "h1.article-title::text, h1.title::text, h1::text"
+      description: ".article-summary::text, .sapo::text"
+      content: "div.article-content, #channel-detail"
+      author: ".author::text"
+      remove: ".article-sharing, .rightdetail, .article-fbs-sharing, .top_date_social, .social_shares, .tags, .banner"
+
+  baodautu_finance:
+    enabled: true
+    name: Bao Dau Tu - Dau tu tai chinh
+    region: VN
+    country: VN
+    language: vi
+    category: finance
+    discovery: rss
+    feed_url: https://baodautu.vn/dau-tu-tai-chinh.rss
+    max_items: 5
+    enrich_article: true
+    renderer: crawl4ai
+    selectors:
+      title: "h1.title::text, h1.article-title::text, h1::text"
+      description: ".sapo::text"
+      content: "#content_detail, .article-content"
+      remove: ".relate-container, .banner, .box-category"
+
+  thanhnien_stocks:
+    enabled: true
+    name: Thanh Nien - Chung khoan
+    region: VN
+    country: VN
+    language: vi
+    category: stocks
+    discovery: rss
+    feed_url: https://thanhnien.vn/rss/kinh-te/chung-khoan.rss
+    max_items: 5
+    enrich_article: true
+    renderer: crawl4ai
+    selectors:
+      title: "h1.detail-title::text, h1::text"
+      description: ".detail-sapo::text, .sapo::text"
+      content: ".detail-content"
+      author: ".author::text"
+      remove: ".relate-news, .banner, .box-category, .tags"
+
+  tuoitre_business:
+    enabled: true
+    name: Tuoi Tre - Kinh doanh
+    region: VN
+    country: VN
+    language: vi
+    category: business
+    discovery: rss
+    feed_url: https://tuoitre.vn/rss/kinh-doanh.rss
+    max_items: 5
+    enrich_article: true
+    renderer: crawl4ai
+    selectors:
+      title: "h1.article-title::text, h1::text"
+      description: ".article-sapo::text, .sapo::text"
+      content: ".detail-content, .article-content, .fck"
+      author: ".author-info::text"
+      remove: ".relate-container, .banner, .box-category, .tags"
+
+  dantri_business:
+    enabled: true
+    name: Dan Tri - Kinh doanh
+    region: VN
+    country: VN
+    language: vi
+    category: business
+    discovery: rss
+    feed_url: https://dantri.com.vn/rss/kinh-doanh.rss
+    max_items: 5
+    enrich_article: true
+    renderer: crawl4ai
+    selectors:
+      title: "h1.title-page_detail::text, h1::text"
+      description: ".singular-sapo::text, p.sapo::text"
+      content: ".e-magazine__body, article#articleContent, article.e-magazine, .singular-content, .dt-content"
+      author: ".author-name::text"
+      remove: ".news-relate, .ad-banner, .box-category, .social-share, .tags, .emagazine-sidebar"
+
+  vietnamplus_stocks:
+    enabled: true
+    name: VietnamPlus - Chung khoan
+    region: VN
+    country: VN
+    language: vi
+    category: stocks
+    discovery: rss
+    feed_url: https://www.vietnamplus.vn/rss/kinhte/chungkhoan-344.rss
+    max_items: 5
+    enrich_article: true
+    renderer: crawl4ai
+    selectors:
+      title: "h1.article__title::text, h1::text"
+      description: ".article__sapo, .cms-desc, meta[name='description']::attr(content)"
+      content: ".article__body, .cms-body, .zce-content-body"
+      author: ".article__author::text, .author::text"
+      remove: ".article__relate, .box-relate, .box-content, .content-list, .social-share, .tags"
+
+  vtv_finance:
+    enabled: true
+    name: VTV - Tai chinh
+    region: VN
+    country: VN
+    language: vi
+    category: finance
+    discovery: rss
+    feed_url: https://vtv.vn/rss/kinh-te/tai-chinh.rss
+    max_items: 5
     enrich_article: true
     renderer: crawl4ai
 
+  vietnamnews_economy:
+    enabled: true
+    name: Viet Nam News - Economy
+    region: VN
+    country: VN
+    language: en
+    category: economy
+    discovery: html
+    start_url: https://vietnamnews.vn/economy/
+    link_selector: 'a::attr(href)'
+    include_regex: 'https?://vietnamnews\.vn/economy/[0-9]+/'
+    max_items: 5
+    enrich_article: true
+    renderer: scrapy
+    selectors:
+      title: "h1.headline::text, h1.title::text, meta[property='og:title']::attr(content)"
+      description: ".detail__summary, .sapo, meta[name='description']::attr(content)"
+      content: ".detail__content, div.content"
+      author: ".detail__author::text, .author::text"
+      remove: ".detail__tags, .tags, .social-share, .box-category, .banner, .ad, [class*='relate']"
+
+  vov_economy:
+    enabled: true
+    name: VOV - Kinh te
+    region: VN
+    country: VN
+    language: vi
+    category: economy
+    discovery: html
+    start_url: https://vov.vn/kinh-te
+    link_selector: 'a::attr(href)'
+    include_regex: 'https?://vov\.vn/kinh-te/.+\.vov$'
+    max_items: 5
+    enrich_article: true
+    renderer: crawl4ai
+
+  vietnamnet_business:
+    enabled: true
+    name: VietNamNet - Kinh doanh
+    region: VN
+    country: VN
+    language: vi
+    category: business
+    discovery: html
+    start_url: https://vietnamnet.vn/kinh-doanh
+    link_selector: 'a::attr(href)'
+    include_regex: 'https?://vietnamnet\.vn/.+-[0-9]+\.html$'
+    max_items: 5
+    enrich_article: true
+    renderer: crawl4ai
+
+  nhandan_economy:
+    enabled: true
+    name: Nhan Dan - Kinh te
+    region: VN
+    country: VN
+    language: vi
+    category: economy
+    discovery: html
+    start_url: https://nhandan.vn/kinhte/
+    link_selector: 'a::attr(href)'
+    include_regex: 'https?://nhandan\.vn/.+-post[0-9]+\.html$'
+    max_items: 5
+    enrich_article: true
+    renderer: crawl4ai
+    selectors:
+      title: "h1.article__title::text, h1::text"
+      description: ".article__sapo, .cms-desc, meta[name='description']::attr(content)"
+      content: ".article__body, .cms-body, .zce-content-body"
+      author: ".article__author::text, .author::text"
+      remove: ".article__relate, .box-relate, .social-share, .tags, .box-category, .box-content, .content-list"
+
+  # =========================
+  # GLOBAL / INTERNATIONAL
+  # =========================
   investing_stock_market:
     enabled: true
     name: Investing.com - Stock Market News
     region: GLOBAL
+    country: US
     language: en
+    category: stocks
     discovery: rss
     feed_url: https://www.investing.com/rss/news_25.rss
-    max_items: 8
+    max_items: 5
     enrich_article: true
     renderer: crawl4ai
+    selectors:
+      title: "h1::text"
+      description: "div[class*='article_WYSIWYG'] > div:first-child > p:first-of-type, meta[name='description']::attr(content)"
+      content: "div[class*='article_WYSIWYG'] > div:first-child, #article > div:first-child, div[class*='article_WYSIWYG'], #article"
+      author: "[class*='author']::text, a[href*='/members/']::text"
+      remove: "div[class*='items-start'], div[class*='md:mb-8'], [class*='highcharts'], [class*='ProPicks'], [class*='border-[#E6E9EB]'], [class*='leading-normal'], button, form"
+
+  cnbc_business:
+    enabled: true
+    name: CNBC - Top News
+    region: GLOBAL
+    country: US
+    language: en
+    category: business
+    discovery: rss
+    feed_url: https://www.cnbc.com/id/100003114/device/rss/rss.html
+    max_items: 5
+    enrich_article: true
+    renderer: crawl4ai
+    selectors:
+      title: "h1.ArticleHeader-headline::text, h1::text"
+      description: 'meta[name="description"]::attr(content)'
+      content: ".ArticleBody-articleBody"
+      author: ".Author-authorName::text"
+      remove: ".InlineImage-wrapper, .RelatedContent-container, .SponsoredContent"
+
+  marketwatch_top:
+    enabled: true
+    name: MarketWatch - Top Stories
+    region: GLOBAL
+    country: US
+    language: en
+    category: markets
+    discovery: rss
+    feed_url: https://feeds.marketwatch.com/marketwatch/topstories/
+    max_items: 5
+    enrich_article: true
+    renderer: crawl4ai
+    selectors:
+      title: "h1.article__headline::text, h1::text"
+      description: 'meta[name="description"]::attr(content), .article__subheadline::text'
+      content: ".article__body, #article-body, div[class*='article__body']"
+      remove: ".element--ad, .social-tools, .article__related, .article__actions, [class*='ad-']"
+
+  nasdaq_markets:
+    enabled: true
+    name: Nasdaq - Markets
+    region: GLOBAL
+    country: US
+    language: en
+    category: markets
+    discovery: rss
+    feed_url: https://www.nasdaq.com/feed/rssoutbound?category=Markets
+    max_items: 5
+    enrich_article: true
+    renderer: crawl4ai
+
+  bbc_business:
+    enabled: true
+    name: BBC - Business
+    region: GLOBAL
+    country: UK
+    language: en
+    category: business
+    discovery: rss
+    feed_url: https://feeds.bbci.co.uk/news/business/rss.xml
+    max_items: 5
+    enrich_article: true
+    renderer: crawl4ai
+
+  guardian_business:
+    enabled: true
+    name: The Guardian - Business
+    region: GLOBAL
+    country: UK
+    language: en
+    category: business
+    discovery: rss
+    feed_url: https://www.theguardian.com/uk/business/rss
+    max_items: 5
+    enrich_article: true
+    renderer: crawl4ai
+
+  reuters_business:
+    enabled: true
+    name: Reuters - Business
+    region: GLOBAL
+    country: US
+    language: en
+    category: business
+    discovery: html
+    start_url: https://www.reuters.com/business/
+    link_selector: 'a::attr(href)'
+    include_regex: 'https?://www\.reuters\.com/(business|markets)/.+/[0-9]{4}-[0-9]{2}-[0-9]{2}/?$'
+    max_items: 5
+    enrich_article: true
+    renderer: crawl4ai
+
+  ft_markets:
+    enabled: true
+    name: Financial Times - Markets
+    region: GLOBAL
+    country: UK
+    language: en
+    category: markets
+    discovery: html
+    start_url: https://www.ft.com/markets
+    link_selector: 'a::attr(href)'
+    include_regex: 'https?://www\.ft\.com/content/[a-f0-9-]+'
+    max_items: 5
+    enrich_article: true
+    renderer: crawl4ai
+
+  coindesk:
+    enabled: true
+    name: CoinDesk
+    region: GLOBAL
+    country: US
+    language: en
+    category: crypto
+    discovery: rss
+    feed_url: https://www.coindesk.com/arc/outboundfeeds/rss/
+    max_items: 5
+    enrich_article: true
+    renderer: crawl4ai
+
+  cointelegraph:
+    enabled: true
+    name: Cointelegraph
+    region: GLOBAL
+    country: GLOBAL
+    language: en
+    category: crypto
+    discovery: rss
+    feed_url: https://cointelegraph.com/rss
+    max_items: 5
+    enrich_article: true
+    renderer: crawl4ai
+    selectors:
+      title: "h1::text"
+      description: "p.lead, div.post-lead, meta[name='description']::attr(content)"
+      content: "div.ct-prose, [class*='ct-prose'], div.post-content"
+      author: "[class*='author']::text, .post-meta__author::text"
+      remove: "[class*='related'], [class*='banner'], [class*='ad'], button, form, .social-share"
+
+  benzinga:
+    enabled: true
+    name: Benzinga
+    region: GLOBAL
+    country: US
+    language: en
+    category: markets
+    discovery: rss
+    feed_url: https://www.benzinga.com/feed
+    max_items: 5
+    enrich_article: true
+    renderer: crawl4ai
+
+  finextra:
+    enabled: true
+    name: Finextra
+    region: GLOBAL
+    country: UK
+    language: en
+    category: fintech
+    discovery: rss
+    feed_url: https://www.finextra.com/rss/headlines.aspx
+    max_items: 5
+    enrich_article: true
+    renderer: crawl4ai
+    selectors:
+      title: "h1::text"
+      description: "p.standfirst::text, .standfirst::text"
+      content: "div.article-content, .article-content"
+      remove: ".card-baseline, .card-button, .btnLinkedIn, .button-like, .ad, .box-category, .social-share, .share-buttons"
+
+  pymnts:
+    enabled: true
+    name: PYMNTS
+    region: GLOBAL
+    country: US
+    language: en
+    category: fintech
+    discovery: rss
+    feed_url: https://www.pymnts.com/feed/
+    max_items: 5
+    enrich_article: true
+    renderer: scrapy
+
+  seekingalpha:
+    enabled: true
+    name: Seeking Alpha
+    region: GLOBAL
+    country: US
+    language: en
+    category: markets
+    discovery: rss
+    feed_url: https://seekingalpha.com/feed.xml
+    max_items: 5
+    enrich_article: true
+    renderer: crawl4ai
+
+  federal_reserve:
+    enabled: true
+    name: Federal Reserve - Press Releases
+    region: GLOBAL
+    country: US
+    language: en
+    category: central_bank
+    discovery: rss
+    feed_url: https://www.federalreserve.gov/feeds/press_all.xml
+    max_items: 5
+    enrich_article: true
+    renderer: scrapy
+
+  ecb_press:
+    enabled: true
+    name: European Central Bank - Press
+    region: GLOBAL
+    country: EU
+    language: en
+    category: central_bank
+    discovery: rss
+    feed_url: https://www.ecb.europa.eu/rss/press.html
+    max_items: 5
+    enrich_article: true
+    renderer: scrapy
+
+  sec_press:
+    enabled: true
+    name: U.S. SEC - Press Releases
+    region: GLOBAL
+    country: US
+    language: en
+    category: regulation
+    discovery: rss
+    feed_url: https://www.sec.gov/news/pressreleases.rss
+    max_items: 5
+    enrich_article: true
+    renderer: scrapy
+    headers:
+      User-Agent: StockNewsCrawler/2.0 contact@example.com
+
+  bank_of_england:
+    enabled: true
+    name: Bank of England - News
+    region: GLOBAL
+    country: UK
+    language: en
+    category: central_bank
+    discovery: rss
+    feed_url: https://www.bankofengland.co.uk/rss/news
+    max_items: 5
+    enrich_article: true
+    renderer: scrapy
+
+  imf_news:
+    enabled: true
+    name: IMF - News
+    region: GLOBAL
+    country: GLOBAL
+    language: en
+    category: macro
+    discovery: rss
+    feed_url: https://www.imf.org/en/News/RSS
+    max_items: 5
+    enrich_article: true
+    renderer: scrapy
+
+  nikkei_asia:
+    enabled: true
+    name: Nikkei Asia
+    region: GLOBAL
+    country: JP
+    language: en
+    category: business
+    discovery: rss
+    feed_url: https://asia.nikkei.com/rss/feed/nar
+    max_items: 5
+    enrich_article: true
+    renderer: crawl4ai
+
+  cna_business:
+    enabled: true
+    name: CNA - Business
+    region: GLOBAL
+    country: SG
+    language: en
+    category: business
+    discovery: rss
+    feed_url: 'https://www.channelnewsasia.com/api/v1/rss-outbound-feed?_format=xml&category=6936'
+    max_items: 5
+    enrich_article: true
+    renderer: crawl4ai
+
+  straits_times_business:
+    enabled: true
+    name: The Straits Times - Business
+    region: GLOBAL
+    country: SG
+    language: en
+    category: business
+    discovery: rss
+    feed_url: https://www.straitstimes.com/news/business/rss.xml
+    max_items: 5
+    enrich_article: true
+    renderer: crawl4ai
+    selectors:
+      title: "h1::text"
+      description: 'meta[name="description"]::attr(content)'
+      content: "article"
+      author: ".author-name::text"
+      remove: "#am-widget, [id*='am-widget'], .carousel-container, [class*='print:hidden'], .more-on-this-topic-wrapper, .ai-summary, a[href*='newsletter-signup'], a[href*='skimresources'], a[href*='shopee'], a[href*='robinsons']"
+
+  business_times_sg:
+    enabled: true
+    name: The Business Times Singapore
+    region: GLOBAL
+    country: SG
+    language: en
+    category: business
+    discovery: html
+    start_url: https://www.businesstimes.com.sg/companies-markets
+    link_selector: 'a::attr(href)'
+    include_regex: 'https?://www\.businesstimes\.com\.sg/(companies-markets|international|singapore)/[^?]+-[^?]+$'
+    max_items: 5
+    enrich_article: true
+    renderer: crawl4ai
+    selectors:
+      title: "h1::text"
+      description: "meta[name='description']::attr(content)"
+      content: "div.typo-article-body, article.display-type--mainNewsDefault, article"
+      author: ".author-name::text"
+      remove: "[class*='newsletter'], [class*='related'], button, [class*='share'], .advertisement"
+
+  economic_times_markets:
+    enabled: true
+    name: Economic Times India - Markets
+    region: GLOBAL
+    country: IN
+    language: en
+    category: markets
+    discovery: rss
+    feed_url: https://economictimes.indiatimes.com/markets/rssfeeds/1977021501.cms
+    max_items: 5
+    enrich_article: true
+    renderer: crawl4ai
+
+  livemint_markets:
+    enabled: true
+    name: LiveMint - Markets
+    region: GLOBAL
+    country: IN
+    language: en
+    category: markets
+    discovery: rss
+    feed_url: https://www.livemint.com/rss/marketsRSS
+    max_items: 5
+    enrich_article: true
+    renderer: crawl4ai
+
+  moneycontrol_markets:
+    enabled: true
+    name: Moneycontrol - Market Reports
+    region: GLOBAL
+    country: IN
+    language: en
+    category: markets
+    discovery: rss
+    feed_url: https://www.moneycontrol.com/rss/marketreports.xml
+    max_items: 5
+    enrich_article: true
+    renderer: crawl4ai
+
+  japan_times_business:
+    enabled: true
+    name: The Japan Times - Business
+    region: GLOBAL
+    country: JP
+    language: en
+    category: business
+    discovery: rss
+    feed_url: https://www.japantimes.co.jp/news_category/business/feed/
+    max_items: 5
+    enrich_article: true
+    renderer: scrapy
+
+  scmp_business:
+    enabled: true
+    name: South China Morning Post - Business
+    region: GLOBAL
+    country: HK
+    language: en
+    category: business
+    discovery: rss
+    feed_url: https://www.scmp.com/rss/92/feed
+    max_items: 5
+    enrich_article: true
+    renderer: crawl4ai
+
+  abc_australia_business:
+    enabled: true
+    name: ABC Australia - Business
+    region: GLOBAL
+    country: AU
+    language: en
+    category: business
+    discovery: rss
+    feed_url: https://www.abc.net.au/news/feed/51892/rss.xml
+    max_items: 5
+    enrich_article: true
+    renderer: scrapy
+
+  yahoo_tw_international_markets:
+    enabled: true
+    name: Yahoo Finance Taiwan - International Markets
+    region: GLOBAL
+    country: TW
+    language: zh
+    category: markets
+    discovery: rss
+    feed_url: 'https://tw.stock.yahoo.com/rss?category=intl-markets'
+    max_items: 5
+    enrich_article: true
+    renderer: crawl4ai
+
+  techcrunch_fintech:
+    enabled: true
+    name: TechCrunch - Fintech/Startup feed
+    region: GLOBAL
+    country: US
+    language: en
+    category: fintech
+    discovery: rss
+    feed_url: https://techcrunch.com/feed/
+    max_items: 5
+    enrich_article: true
+    renderer: scrapy
+
+  business_standard_markets:
+    enabled: true
+    name: Business Standard Hindi - Markets
+    region: GLOBAL
+    country: IN
+    language: hi
+    category: markets
+    discovery: rss
+    feed_url: https://hindi.business-standard.com/rss/markets.xml
+    max_items: 5
+    enrich_article: true
+    renderer: scrapy

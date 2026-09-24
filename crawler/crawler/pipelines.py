@@ -33,6 +33,12 @@ class PostgresPipeline:
 
         self.conn = psycopg.connect(os.environ["DATABASE_URL"])
         self.conn.autocommit = True
+        # Keep an existing MVP database compatible even when the Postgres
+        # docker-entrypoint init scripts are not re-run for an existing volume.
+        with self.conn.cursor() as cur:
+            cur.execute("ALTER TABLE articles ADD COLUMN IF NOT EXISTS country VARCHAR(64)")
+            cur.execute("ALTER TABLE articles ADD COLUMN IF NOT EXISTS category VARCHAR(64)")
+            cur.execute("ALTER TABLE articles ADD COLUMN IF NOT EXISTS canonical_url TEXT")
 
     def close_spider(self, spider):
         if self.conn:
@@ -45,17 +51,23 @@ class PostgresPipeline:
         row = dict(item)
         sql = """
         INSERT INTO articles (
-            source, source_name, region, language, url, title, description, author,
+            source, source_name, region, country, language, category, url, canonical_url, title, description, author,
             published_at, content_markdown, content_html,
             discovery_method, renderer, discovered_at, raw_data
         ) VALUES (
-            %(source)s, %(source_name)s, %(region)s, %(language)s, %(url)s, %(title)s,
+            %(source)s, %(source_name)s, %(region)s, %(country)s, %(language)s, %(category)s, %(url)s, %(canonical_url)s, %(title)s,
             %(description)s, %(author)s, %(published_at)s,
             %(content_markdown)s, %(content_html)s,
             %(discovery_method)s, %(renderer)s, %(discovered_at)s, %(raw_data)s
         )
         ON CONFLICT (url) DO UPDATE SET
+            source = EXCLUDED.source,
             source_name = EXCLUDED.source_name,
+            region = EXCLUDED.region,
+            country = EXCLUDED.country,
+            language = EXCLUDED.language,
+            category = EXCLUDED.category,
+            canonical_url = EXCLUDED.canonical_url,
             title = EXCLUDED.title,
             description = EXCLUDED.description,
             author = EXCLUDED.author,
@@ -70,8 +82,11 @@ class PostgresPipeline:
             "source": row.get("source"),
             "source_name": row.get("source_name"),
             "region": row.get("region"),
+            "country": row.get("country"),
             "language": row.get("language"),
+            "category": row.get("category"),
             "url": row.get("url"),
+            "canonical_url": row.get("canonical_url"),
             "title": row.get("title"),
             "description": row.get("description"),
             "author": row.get("author"),
