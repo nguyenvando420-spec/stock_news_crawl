@@ -1,0 +1,95 @@
+name: firecrawl
+
+services:
+  playwright-service:
+    image: ghcr.io/firecrawl/playwright-service:latest
+    environment:
+      PORT: 3000
+      PROXY_SERVER: ${PROXY_SERVER}
+      PROXY_USERNAME: ${PROXY_USERNAME}
+      PROXY_PASSWORD: ${PROXY_PASSWORD}
+      BLOCK_MEDIA: ${BLOCK_MEDIA:-true}
+    networks:
+      - backend
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cpus: 1.0
+    mem_limit: 2G
+    tmpfs:
+      - /tmp/.cache:noexec,nosuid,size=1g
+
+  api:
+    image: ghcr.io/firecrawl/firecrawl:latest
+    environment:
+      REDIS_URL: redis://redis:6379
+      REDIS_RATE_LIMIT_URL: redis://redis:6379
+      PLAYWRIGHT_MICROSERVICE_URL: http://playwright-service:3000/scrape
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-postgres}
+      POSTGRES_HOST: nuq-postgres
+      POSTGRES_PORT: 5432
+      NUQ_RABBITMQ_URL: amqp://rabbitmq:5672
+      PORT: 3002
+      HOST: "0.0.0.0"
+      ENV: local
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      OPENAI_BASE_URL: ${OPENAI_BASE_URL}
+      MODEL_NAME: ${MODEL_NAME}
+      OLLAMA_BASE_URL: ${OLLAMA_BASE_URL}
+      TEST_API_KEY: ${TEST_API_KEY}
+    depends_on:
+      redis:
+        condition: service_started
+      playwright-service:
+        condition: service_started
+      rabbitmq:
+        condition: service_healthy
+      nuq-postgres:
+        condition: service_healthy
+    ports:
+      - "3002:3002"
+    command: node dist/src/harness.js --start-docker
+    cpus: 2.0
+    mem_limit: 2G
+    networks:
+      - backend
+
+  redis:
+    image: redis:alpine
+    networks:
+      - backend
+    command: redis-server --bind 0.0.0.0
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    networks:
+      - backend
+    command: rabbitmq-server
+    healthcheck:
+      test: [ "CMD", "rabbitmq-diagnostics", "-q", "check_running" ]
+      interval: 5s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+
+  nuq-postgres:
+    image: ghcr.io/firecrawl/nuq-postgres:latest
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-postgres}
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-postgres}" ]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+    networks:
+      - backend
+
+networks:
+  backend:
+    driver: bridge
