@@ -1,8 +1,96 @@
-name: firecrawl
+name: firecrawl-automation
 
 services:
+  # ========================================================
+  # 1. ORCHESTRATION & AUTOMATION WORKFLOWS (n8n)
+  # ========================================================
+  n8n:
+    image: docker.n8n.io/n8nio/n8n:latest
+    restart: unless-stopped
+    ports:
+      - "${N8N_PORT:-5678}:5678"
+    environment:
+      - N8N_HOST=${N8N_HOST:-localhost}
+      - N8N_PORT=5678
+      - N8N_PROTOCOL=${N8N_PROTOCOL:-http}
+      - NODE_ENV=production
+      - WEBHOOK_URL=${WEBHOOK_URL:-http://localhost:5678/}
+      - GENERIC_TIMEZONE=${GENERIC_TIMEZONE:-Asia/Ho_Chi_Minh}
+      - TZ=Asia/Ho_Chi_Minh
+      - N8N_ENCRYPTION_KEY=${N8N_ENCRYPTION_KEY:-n8n_secure_key_firecrawl_2026}
+      # Sử dụng PostgreSQL lưu trữ dữ liệu n8n thay cho SQLite (chuẩn 24/7 production)
+      - DB_TYPE=postgresdb
+      - DB_POSTGRESDB_HOST=postgres
+      - DB_POSTGRESDB_PORT=5432
+      - DB_POSTGRESDB_DATABASE=${APP_DB_NAME:-automation_data}
+      - DB_POSTGRESDB_USER=${APP_DB_USER:-postgres}
+      - DB_POSTGRESDB_PASSWORD=${APP_DB_PASSWORD:-automation_secure_password_2026}
+      - DB_POSTGRESDB_SCHEMA=n8n
+      # Tự động dọn dẹp lịch sử chạy định kỳ tránh đầy ổ cứng khi chạy 24/7
+      - EXECUTIONS_DATA_PRUNE=true
+      - EXECUTIONS_DATA_MAX_AGE=168
+      - EXECUTIONS_DATA_PRUNE_MAX_COUNT=50000
+      # Biến môi trường Gemini API Key cho các node n8n
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+    volumes:
+      - n8n_data:/home/node/.n8n
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - backend
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ========================================================
+  # 2. CƠ SỞ DỮ LIỆU SẢN XUẤT (PostgreSQL)
+  # ========================================================
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${APP_DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${APP_DB_PASSWORD:-automation_secure_password_2026}
+      POSTGRES_DB: ${APP_DB_NAME:-automation_data}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init-db.sql:/docker-entrypoint-initdb.d/init-db.sql:ro
+    ports:
+      - "${POSTGRES_PORT:-5433}:5432"
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U ${APP_DB_USER:-postgres} -d ${APP_DB_NAME:-automation_data}" ]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+    networks:
+      - backend
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ========================================================
+  # 3. FIRECRAWL SCRAPER ENGINE (Playwright + Core API)
+  # ========================================================
+  tor-proxy:
+    image: dperson/torproxy:latest
+    restart: unless-stopped
+    networks:
+      - backend
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
   playwright-service:
     image: ghcr.io/firecrawl/playwright-service:latest
+    restart: unless-stopped
     environment:
       PORT: 3000
       PROXY_SERVER: ${PROXY_SERVER}
@@ -15,17 +103,25 @@ services:
       - no-new-privileges:true
     cap_drop:
       - ALL
-    cpus: 1.0
-    mem_limit: 2G
+    cpus: 1.5
+    mem_limit: 2.5G
     tmpfs:
       - /tmp/.cache:noexec,nosuid,size=1g
+    command: node dist/api.js
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   api:
     image: ghcr.io/firecrawl/firecrawl:latest
+    restart: unless-stopped
     environment:
       REDIS_URL: redis://redis:6379
       REDIS_RATE_LIMIT_URL: redis://redis:6379
       PLAYWRIGHT_MICROSERVICE_URL: http://playwright-service:3000/scrape
+
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
       POSTGRES_DB: ${POSTGRES_DB:-postgres}
@@ -35,10 +131,11 @@ services:
       PORT: 3002
       HOST: "0.0.0.0"
       ENV: local
-      OPENAI_API_KEY: ${OPENAI_API_KEY}
-      OPENAI_BASE_URL: ${OPENAI_BASE_URL}
-      MODEL_NAME: ${MODEL_NAME}
-      OLLAMA_BASE_URL: ${OLLAMA_BASE_URL}
+
+      # Hỗ trợ trực tiếp Google Gemini qua chuẩn OpenAI compatibility của Google
+      OPENAI_BASE_URL: ${OPENAI_BASE_URL:-https://generativelanguage.googleapis.com/v1beta/openai}
+      OPENAI_API_KEY: ${GEMINI_API_KEY:-${OPENAI_API_KEY}}
+      MODEL_NAME: ${GEMINI_MODEL:-gemini-2.0-flash}
       TEST_API_KEY: ${TEST_API_KEY}
     depends_on:
       redis:
@@ -50,37 +147,64 @@ services:
       nuq-postgres:
         condition: service_healthy
     ports:
-      - "3002:3002"
+      - "${PORT:-3002}:3002"
     command: node dist/src/harness.js --start-docker
     cpus: 2.0
-    mem_limit: 2G
+    mem_limit: 3G
     networks:
       - backend
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
 
+  # ========================================================
+  # 4. HÀNG ĐỢI & BỘ ĐỆM NỘI BỘ (Redis, RabbitMQ, nuq-postgres)
+  # ========================================================
   redis:
     image: redis:alpine
+    restart: unless-stopped
+    command: redis-server --bind 0.0.0.0 --appendonly yes
+    volumes:
+      - redis_data:/data
     networks:
       - backend
-    command: redis-server --bind 0.0.0.0
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "5m"
+        max-file: "2"
 
   rabbitmq:
     image: rabbitmq:3-management
-    networks:
-      - backend
+    restart: unless-stopped
     command: rabbitmq-server
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
     healthcheck:
       test: [ "CMD", "rabbitmq-diagnostics", "-q", "check_running" ]
       interval: 5s
       timeout: 5s
       retries: 3
       start_period: 5s
+    networks:
+      - backend
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "5m"
+        max-file: "2"
 
   nuq-postgres:
     image: ghcr.io/firecrawl/nuq-postgres:latest
+    restart: unless-stopped
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
       POSTGRES_DB: ${POSTGRES_DB:-postgres}
+    volumes:
+      - nuq_postgres_data:/var/lib/postgresql/data
     healthcheck:
       test: [ "CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-postgres}" ]
       interval: 5s
@@ -89,7 +213,19 @@ services:
       start_period: 5s
     networks:
       - backend
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "5m"
+        max-file: "2"
 
 networks:
   backend:
     driver: bridge
+
+volumes:
+  n8n_data:
+  postgres_data:
+  redis_data:
+  rabbitmq_data:
+  nuq_postgres_data:
