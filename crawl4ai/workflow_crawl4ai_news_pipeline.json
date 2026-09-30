@@ -1,0 +1,366 @@
+{
+  "name": "Crawl4AI & n8n News Pipeline (2-Stage Auto Crawler)",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "trigger-manual",
+      "name": "Khi bấm Test (Manual Trigger)",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [100, 240]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 30
+            }
+          ]
+        }
+      },
+      "id": "trigger-schedule",
+      "name": "Lập lịch định kỳ (Mỗi 30 phút)",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [100, 420]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT id, source_name, source_category, source_url FROM public.crawl_targets WHERE active = true ORDER BY id ASC;"
+      },
+      "id": "get-sources",
+      "name": "1. Lấy Danh Sách Nguồn Tin (Postgres)",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [340, 320],
+      "credentials": {
+        "postgres": {
+          "id": "sHxc5RWg5GkqDMcY",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "batchSize": 1,
+        "options": {}
+      },
+      "id": "loop-sources",
+      "name": "2. Duyệt từng Nguồn Tin",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [560, 320]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://crawl4ai:11235/crawl",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer crawl4ai_secret_token_2026"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"urls\": [\"{{ $json.source_url }}\"],\n  \"priority\": 10,\n  \"crawler_params\": {\n    \"headless\": true,\n    \"magic\": true,\n    \"simulate_user\": true\n  }\n}",
+        "options": {
+          "timeout": 60000
+        }
+      },
+      "id": "crawl-links-crawl4ai",
+      "name": "3. Cào Links Danh Mục (Crawl4AI)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [780, 320],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Node 4: Lọc và Bóc Tách Danh Sách Link Bài Viết từ Crawl4AI\nconst inputItems = $input.all();\nlet currentSource = null;\n\ntry {\n  currentSource = $('2. Duyệt từng Nguồn Tin').item.json;\n} catch (e) {\n  try {\n    currentSource = $('2. Duyệt từng Nguồn Tin').first().json;\n  } catch (err) {\n    currentSource = { id: 0, source_name: 'Nguồn tin', source_category: 'Tin tức', source_url: '' };\n  }\n}\n\nlet allLinks = [];\nfor (const item of inputItems) {\n  const res = item.json || {};\n  const crawlResult = (Array.isArray(res.results) ? res.results[0] : (res.result || res.data || res)) || {};\n  const linksObj = crawlResult.links || {};\n  \n  if (Array.isArray(linksObj.internal)) {\n    for (const l of linksObj.internal) {\n      if (typeof l === 'string') allLinks.push(l);\n      else if (l && l.href) allLinks.push(l.href);\n    }\n  }\n  if (Array.isArray(linksObj)) {\n    for (const l of linksObj) {\n      if (typeof l === 'string') allLinks.push(l);\n      else if (l && l.href) allLinks.push(l.href);\n    }\n  }\n}\n\nconst assetRegex = /\\.(png|jpe?g|gif|webp|svg|css|js|ico|pdf|zip|mp4|mp3|docx?|xlsx?)(\\?.*)?$/i;\nconst excludeKeywords = [\n  '/tag/', '/tags/', '/chuyen-muc/', '/category/', '/dieu-khoan', '/lien-he', '/gioi-thieu',\n  '/rss', '/video', '/photo', '/infographic', '/login', '/dang-nhap', '/dang-ky',\n  'facebook.com', 'twitter.com', 'youtube.com', 'zalo.me', 'linkedin.com', 'tiktok.com',\n  'javascript:', 'mailto:', 'tel:', '#'\n];\n\nconst sourceUrlClean = (currentSource.source_url || '').replace(/\\/+$/, '');\nconst seen = new Set();\nconst candidateUrls = [];\n\nfor (const rawUrl of allLinks) {\n  if (!rawUrl || typeof rawUrl !== 'string') continue;\n  let url = rawUrl.trim().split('#')[0];\n  if (url.startsWith('//')) url = 'https:' + url;\n  if (!url.startsWith('http://') && !url.startsWith('https://')) continue;\n  if (url.replace(/\\/+$/, '') === sourceUrlClean) continue;\n  if (assetRegex.test(url)) continue;\n  if (excludeKeywords.some(kw => url.toLowerCase().includes(kw))) continue;\n\n  // Kiểm tra bài viết hợp lệ\n  const isArticle = /\\-[0-9]{4,}/.test(url) || /\\/\\d{4}\\/\\d{2}\\//.test(url) || (/\\.(chn|html|htm)$/i.test(url) && url.split('/').pop().length > 20);\n  \n  if (isArticle && !seen.has(url)) {\n    seen.add(url);\n    candidateUrls.push({\n      json: {\n        candidate_url: url,\n        source_id: currentSource.id,\n        source_name: currentSource.source_name,\n        source_category: currentSource.source_category,\n        source_url: currentSource.source_url\n      }\n    });\n  }\n}\n\n// Giới hạn 6 bài mới nhất mỗi nguồn\nreturn candidateUrls.slice(0, 6);"
+      },
+      "id": "filter-article-urls",
+      "name": "4. Lọc URL Bài Viết",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1000, 320]
+    },
+    {
+      "parameters": {
+        "batchSize": 1,
+        "options": {}
+      },
+      "id": "loop-articles",
+      "name": "5. Duyệt từng Bài Viết",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [1240, 320]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "=SELECT \n  COALESCE((SELECT id FROM public.crawled_articles WHERE url = '{{ $json.candidate_url }}' LIMIT 1), 0) AS article_id,\n  '{{ $json.candidate_url }}' AS candidate_url,\n  '{{ $json.source_name }}' AS source_name,\n  '{{ $json.source_category }}' AS source_category,\n  '{{ $json.source_url }}' AS source_url;"
+      },
+      "id": "check-article-exists",
+      "name": "6. Kiểm tra Trùng lặp (Postgres)",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [1460, 320],
+      "alwaysOutputData": true,
+      "credentials": {
+        "postgres": {
+          "id": "sHxc5RWg5GkqDMcY",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "cond-not-exists",
+              "leftValue": "={{ Number($json.article_id) }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "if-article-new",
+      "name": "7. Bài Viết Chưa Tồn Tại?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1680, 320]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://crawl4ai:11235/crawl",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer crawl4ai_secret_token_2026"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"urls\": [\"{{ $json.candidate_url || $('5. Duyệt từng Bài Viết').item.json.candidate_url }}\"],\n  \"priority\": 10,\n  \"crawler_params\": {\n    \"headless\": true,\n    \"magic\": true,\n    \"word_count_threshold\": 15\n  }\n}",
+        "options": {
+          "timeout": 60000
+        }
+      },
+      "id": "crawl-content-crawl4ai",
+      "name": "8. Cào Nội Dung (Crawl4AI)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1920, 220],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Node 9: Bóc Tách Chi Tiết: Tiêu đề, Nội dung, Ngày xuất bản, Tác giả\nconst itemData = $input.first().json || {};\nlet articleMeta = {};\ntry {\n  articleMeta = $('6. Kiểm tra Trùng lặp (Postgres)').item.json || {};\n} catch (e) {\n  try {\n    articleMeta = $('5. Duyệt từng Bài Viết').item.json || {};\n  } catch (err) {\n    articleMeta = {};\n  }\n}\n\nconst crawlRes = (Array.isArray(itemData.results) ? itemData.results[0] : (itemData.result || itemData.data || itemData)) || {};\nconst metadata = crawlRes.metadata || {};\nconst mdObj = crawlRes.markdown || {};\n\n// 1. LẤY NỘI DUNG\nlet cleanContent = '';\nif (typeof mdObj === 'string') {\n  cleanContent = mdObj;\n} else if (mdObj.fit_markdown && mdObj.fit_markdown.length > 50) {\n  cleanContent = mdObj.fit_markdown;\n} else if (mdObj.raw_markdown) {\n  cleanContent = mdObj.raw_markdown;\n} else if (crawlRes.content) {\n  cleanContent = crawlRes.content;\n}\n\n// 2. LẤY TIÊU ĐỀ\nlet title = metadata.title || metadata.ogTitle || metadata['og:title'] || '';\nif (!title && cleanContent) {\n  const hMatch = cleanContent.match(/^#{1,3}\\s+(.+)$/m);\n  if (hMatch && hMatch[1].trim().length > 5) {\n    title = hMatch[1].trim();\n  }\n}\ntitle = (title || 'Bài viết từ ' + (articleMeta.source_name || 'Nguồn tin')).replace(/\\s*[-|–—]\\s*(?:Báo|Trang tin)?[A-Za-zÀ-Ỹà-ỹ0-9\\s\\.]+\\.(?:vn|com)$/i, '').trim();\n\n// 3. LẤY NGÀY XUẤT BẢN\nlet publishedDate = null;\nconst rawDate = metadata['article:published_time'] || metadata.pubdate || metadata.publishedTime || metadata.date || null;\nif (rawDate) {\n  const d = new Date(rawDate);\n  if (!isNaN(d.getTime())) publishedDate = d.toISOString();\n}\nif (!publishedDate && cleanContent) {\n  const dateMatch = cleanContent.match(/([0-3]?[0-9][\\/\\-\\.] [0-1]?[0-9][\\/\\-\\.] [1-2][0-9]{3})/);\n  if (dateMatch) {\n    const parts = dateMatch[1].split(/[\\/\\-\\.]/);\n    if (parts.length === 3) {\n      const d = new Date(`${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}T07:00:00+07:00`);\n      if (!isNaN(d.getTime())) publishedDate = d.toISOString();\n    }\n  }\n}\n\n// 4. LẤY TÁC GIẢ\nlet author = metadata.author || metadata['article:author'] || '';\nif (!author && cleanContent) {\n  const aMatch = cleanContent.match(/(?:Tác giả|Nguồn|Theo|PV)[\\s:]+([A-ZÀ-Ỹ][a-zà-ỹ0-9\\s\\.]{2,30})/i);\n  if (aMatch) author = aMatch[1].trim();\n}\nif (!author) author = articleMeta.source_name || 'Ban Biên Tập';\n\n// 5. TÓM TẮT & CẢM XÚC\nlet summary = metadata.description || metadata.ogDescription || '';\nif (!summary && cleanContent) {\n  const paras = cleanContent.split(/\\n\\s*\\n/).map(p => p.trim()).filter(p => p.length > 30);\n  if (paras.length > 0) summary = paras[0].slice(0, 300) + '...';\n}\n\nlet sentiment = 'Trung lập';\nconst textLower = (title + ' ' + summary).toLowerCase();\nif (['tăng mạnh', 'tăng trưởng', 'khởi sắc', 'kỷ lục', 'lợi nhuận', 'bứt phá'].some(w => textLower.includes(w))) {\n  sentiment = 'Tích cực';\n} else if (['giảm sâu', 'lao dốc', 'thua lỗ', 'khó khăn', 'bắt giữ', 'vỡ nợ'].some(w => textLower.includes(w))) {\n  sentiment = 'Tiêu cực';\n}\n\nconst finalUrl = articleMeta.candidate_url || crawlRes.url || '';\n\nreturn [{\n  json: {\n    url: finalUrl,\n    title: title.slice(0, 500),\n    summary: summary.slice(0, 1000),\n    content_raw: cleanContent.slice(0, 50000),\n    published_date: publishedDate,\n    author: String(author).slice(0, 100),\n    source_name: articleMeta.source_name || '',\n    source_category: articleMeta.source_category || 'Tin tức',\n    source_url: articleMeta.source_url || '',\n    sentiment: sentiment,\n    tags: [articleMeta.source_category || 'Tin tức'],\n    metadata: metadata\n  }\n}];"
+      },
+      "id": "parse-article-details",
+      "name": "9. Bóc Tách Chi Tiết Bài Báo",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2140, 220]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "=INSERT INTO public.crawled_articles (\n  url, title, summary, content_raw, published_date, author,\n  source_name, source_category, source_url, tags, sentiment, metadata\n)\nVALUES (\n  '{{ $json.url }}',\n  '{{ ($json.title || \"\").replace(/'/g, \"''\") }}',\n  '{{ ($json.summary || \"\").replace(/'/g, \"''\") }}',\n  '{{ ($json.content_raw || \"\").replace(/'/g, \"''\") }}',\n  {{ $json.published_date ? \"'\" + $json.published_date + \"'::timestamptz\" : \"NULL\" }},\n  '{{ ($json.author || \"\").replace(/'/g, \"''\") }}',\n  '{{ ($json.source_name || \"\").replace(/'/g, \"''\") }}',\n  '{{ ($json.source_category || \"\").replace(/'/g, \"''\") }}',\n  '{{ ($json.source_url || \"\").replace(/'/g, \"''\") }}',\n  ARRAY[{{ ($json.tags || []).map(t => \"'\" + t.replace(/'/g, \"''\") + \"'\").join(',') }}]::text[],\n  '{{ $json.sentiment || \"Trung lập\" }}',\n  '{{ JSON.stringify($json.metadata || {}).replace(/'/g, \"''\") }}'::jsonb\n)\nON CONFLICT (url) DO UPDATE SET\n  title = EXCLUDED.title,\n  summary = EXCLUDED.summary,\n  content_raw = EXCLUDED.content_raw,\n  published_date = COALESCE(EXCLUDED.published_date, public.crawled_articles.published_date),\n  author = COALESCE(EXCLUDED.author, public.crawled_articles.author),\n  tags = EXCLUDED.tags,\n  sentiment = EXCLUDED.sentiment,\n  metadata = EXCLUDED.metadata,\n  updated_at = CURRENT_TIMESTAMP;"
+      },
+      "id": "save-article-to-db",
+      "name": "10. Lưu Bài Báo (Postgres)",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [2360, 220],
+      "credentials": {
+        "postgres": {
+          "id": "sHxc5RWg5GkqDMcY",
+          "name": "Postgres account"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Khi bấm Test (Manual Trigger)": {
+      "main": [
+        [
+          {
+            "node": "1. Lấy Danh Sách Nguồn Tin (Postgres)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Lập lịch định kỳ (Mỗi 30 phút)": {
+      "main": [
+        [
+          {
+            "node": "1. Lấy Danh Sách Nguồn Tin (Postgres)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "1. Lấy Danh Sách Nguồn Tin (Postgres)": {
+      "main": [
+        [
+          {
+            "node": "2. Duyệt từng Nguồn Tin",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "2. Duyệt từng Nguồn Tin": {
+      "main": [
+        [],
+        [
+          {
+            "node": "3. Cào Links Danh Mục (Crawl4AI)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "3. Cào Links Danh Mục (Crawl4AI)": {
+      "main": [
+        [
+          {
+            "node": "4. Lọc URL Bài Viết",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "4. Lọc URL Bài Viết": {
+      "main": [
+        [
+          {
+            "node": "5. Duyệt từng Bài Viết",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "5. Duyệt từng Bài Viết": {
+      "main": [
+        [
+          {
+            "node": "2. Duyệt từng Nguồn Tin",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "6. Kiểm tra Trùng lặp (Postgres)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "6. Kiểm tra Trùng lặp (Postgres)": {
+      "main": [
+        [
+          {
+            "node": "7. Bài Viết Chưa Tồn Tại?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "7. Bài Viết Chưa Tồn Tại?": {
+      "main": [
+        [
+          {
+            "node": "8. Cào Nội Dung (Crawl4AI)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "5. Duyệt từng Bài Viết",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "8. Cào Nội Dung (Crawl4AI)": {
+      "main": [
+        [
+          {
+            "node": "9. Bóc Tách Chi Tiết Bài Báo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "9. Bóc Tách Chi Tiết Bài Báo": {
+      "main": [
+        [
+          {
+            "node": "10. Lưu Bài Báo (Postgres)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "10. Lưu Bài Báo (Postgres)": {
+      "main": [
+        [
+          {
+            "node": "5. Duyệt từng Bài Viết",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

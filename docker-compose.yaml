@@ -77,25 +77,11 @@ services:
   # ========================================================
   # 3. FIRECRAWL SCRAPER ENGINE (Playwright + Core API)
   # ========================================================
-  tor-proxy:
-    image: dperson/torproxy:latest
-    restart: unless-stopped
-    networks:
-      - backend
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
-
   playwright-service:
     image: ghcr.io/firecrawl/playwright-service:latest
     restart: unless-stopped
     environment:
       PORT: 3000
-      PROXY_SERVER: ${PROXY_SERVER}
-      PROXY_USERNAME: ${PROXY_USERNAME}
-      PROXY_PASSWORD: ${PROXY_PASSWORD}
       BLOCK_MEDIA: ${BLOCK_MEDIA:-true}
     networks:
       - backend

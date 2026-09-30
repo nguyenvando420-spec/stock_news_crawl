@@ -1,0 +1,104 @@
+name: crawl4ai-n8n-pipeline
+
+services:
+  # ========================================================
+  # 1. ORCHESTRATION & AUTOMATION (n8n)
+  # ========================================================
+  n8n:
+    image: docker.n8n.io/n8nio/n8n:latest
+    restart: unless-stopped
+    ports:
+      - "${N8N_PORT:-5679}:5678"
+    environment:
+      - N8N_HOST=${N8N_HOST:-localhost}
+      - N8N_PORT=5678
+      - N8N_PROTOCOL=${N8N_PROTOCOL:-http}
+      - NODE_ENV=production
+      - WEBHOOK_URL=${WEBHOOK_URL:-http://localhost:5679/}
+      - GENERIC_TIMEZONE=${GENERIC_TIMEZONE:-Asia/Ho_Chi_Minh}
+      - TZ=Asia/Ho_Chi_Minh
+      - N8N_ENCRYPTION_KEY=${N8N_ENCRYPTION_KEY:-n8n_crawl4ai_secret_key_2026}
+      # Sử dụng PostgreSQL lưu trữ dữ liệu n8n
+      - DB_TYPE=postgresdb
+      - DB_POSTGRESDB_HOST=postgres
+      - DB_POSTGRESDB_PORT=5432
+      - DB_POSTGRESDB_DATABASE=${POSTGRES_DB:-news_db}
+      - DB_POSTGRESDB_USER=${POSTGRES_USER:-postgres}
+      - DB_POSTGRESDB_PASSWORD=${POSTGRES_PASSWORD:-crawl4ai_password_2026}
+      - DB_POSTGRESDB_SCHEMA=n8n
+      # Tự động dọn dẹp lịch sử execution tránh đầy ổ cứng
+      - EXECUTIONS_DATA_PRUNE=true
+      - EXECUTIONS_DATA_MAX_AGE=168
+      - EXECUTIONS_DATA_PRUNE_MAX_COUNT=50000
+      - CRAWL4AI_API_TOKEN=${CRAWL4AI_API_TOKEN:-crawl4ai_secret_token_2026}
+    volumes:
+      - n8n_data:/home/node/.n8n
+    depends_on:
+      postgres:
+        condition: service_healthy
+      crawl4ai:
+        condition: service_started
+    networks:
+      - crawl4ai-net
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ========================================================
+  # 2. CRAWLER ENGINE (Crawl4AI REST API)
+  # ========================================================
+  crawl4ai:
+    image: unclecode/crawl4ai:0.8.6
+    restart: unless-stopped
+    ports:
+      - "${CRAWL4AI_PORT:-11235}:11235"
+    environment:
+      - CRAWL4AI_API_TOKEN=${CRAWL4AI_API_TOKEN:-crawl4ai_secret_token_2026}
+    # Cấp đủ shared memory cho Playwright Chromium tránh crash trang nặng
+    shm_size: 1gb
+    networks:
+      - crawl4ai-net
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ========================================================
+  # 3. DATABASE (PostgreSQL)
+  # ========================================================
+  postgres:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-crawl4ai_password_2026}
+      POSTGRES_DB: ${POSTGRES_DB:-news_db}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init-db.sql:/docker-entrypoint-initdb.d/init-db.sql:ro
+    ports:
+      - "${POSTGRES_PORT:-5434}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-news_db}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+    networks:
+      - crawl4ai-net
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+networks:
+  crawl4ai-net:
+    driver: bridge
+
+volumes:
+  n8n_data:
+  postgres_data:
