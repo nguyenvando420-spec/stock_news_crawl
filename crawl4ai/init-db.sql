@@ -52,8 +52,24 @@ VALUES
     ('CafeF - Chứng khoán', 'Báo Tài chính VN', 'https://cafef.vn/thi-truong-chung-khoan.chn', 30),
     ('VnEconomy - Chứng khoán', 'Báo Tài chính VN', 'https://vneconomy.vn/chung-khoan.htm', 30),
     ('VnBusiness - Chứng khoán', 'Báo Tài chính VN', 'https://vnbusiness.vn/chung-khoan', 30),
+    ('VnBusiness - Tài chính', 'Báo Tài chính VN', 'https://vnbusiness.vn/tai-chinh', 30),
+    ('VnBusiness - Doanh nghiệp', 'Báo Tài chính VN', 'https://vnbusiness.vn/doanh-nghiep', 30),
     ('Thời báo Tài chính - Chứng khoán', 'Báo Tài chính VN', 'https://thoibaotaichinhvietnam.vn/chung-khoan', 30),
+    ('Thời báo Tài chính - Tài chính', 'Báo Tài chính VN', 'https://thoibaotaichinhvietnam.vn/tai-chinh', 30),
+    ('Thời báo Tài chính - Đầu tư', 'Báo Tài chính VN', 'https://thoibaotaichinhvietnam.vn/dau-tu', 30),
     ('Cổng TT Chính phủ', 'Chính sách & Vĩ mô', 'https://chinhphu.vn/chinh-phu', 30),
-    ('CNBC - Markets', 'Tài chính Quốc tế', 'https://www.cnbc.com/markets/', 30)
+    ('VSDC - Tin thị trường cơ sở', 'Cơ quan Quản lý VN', 'https://vsdc.vn/vi/tin-thi-truong-co-so', 30),
+    ('UBCKNN - Tin tức thị trường', 'Cơ quan Quản lý VN', 'https://ssc.gov.vn/webcenter/portal/ubck/pages_r/m/tintc-skin', 30),
+    ('UBCKNN - Cổng công bố thông tin', 'Cơ quan Quản lý VN', 'https://congbothongtin.ssc.gov.vn/', 30),
+    ('CNBC - Markets', 'Tài chính Quốc tế', 'https://www.cnbc.com/markets/', 30),
+    ('CNBC - Business', 'Tài chính Quốc tế', 'https://www.cnbc.com/business', 30),
+    ('Bloomberg - Tech Sectors', 'Tài chính Quốc tế', 'https://www.bloomberg.com/markets/sectors/information-technology', 30),
+    ('Bloomberg - Markets', 'Tài chính Quốc tế', 'https://www.bloomberg.com/markets', 30),
+    ('WSJ - Business', 'Tài chính Quốc tế', 'https://www.wsj.com/business', 30),
+    ('Financial Times - Companies', 'Tài chính Quốc tế', 'https://www.ft.com/companies', 30),
+    ('Financial Times - Markets Data', 'Tài chính Quốc tế', 'https://markets.ft.com/data', 30)
 ON CONFLICT (source_url) DO UPDATE 
-SET source_name = EXCLUDED.source_name, source_category = EXCLUDED.source_category;
+SET source_name = EXCLUDED.source_name, 
+    source_category = EXCLUDED.source_category,
+    active = true;
+
