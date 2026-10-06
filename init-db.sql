@@ -65,6 +65,8 @@ VALUES
     ('VSDC', 'Cơ quan Quản lý & Pháp lý', 'https://vsdc.vn/vi/tin-thi-truong-co-so', 30),
     ('UBCKNN', 'Cơ quan Quản lý & Pháp lý', 'https://ssc.gov.vn/webcenter/portal/ubck/pages_r/m/tintc-skin', 30),
     ('UBCKNN - Công bố', 'Cơ quan Quản lý & Pháp lý', 'https://congbothongtin.ssc.gov.vn/', 15),
+    ('UBCKNN - Hồ sơ Công ty đại chúng', 'Cơ quan Quản lý & Pháp lý', 'https://congbothongtin.ssc.gov.vn/faces/CompanyProfilesSearch', 1440),
+    ('UBCKNN - Tổ chức kiểm toán', 'Cơ quan Quản lý & Pháp lý', 'https://congbothongtin.ssc.gov.vn/faces/CompanyAuditingSearch', 1440),
     ('Cổng TT Chính phủ', 'Chính sách & Vĩ mô', 'https://chinhphu.vn/chinh-phu', 30),
     ('CNBC - Markets', 'Tài chính Quốc tế', 'https://www.cnbc.com/markets/', 30),
     ('CNBC - Economy', 'Tài chính Quốc tế', 'https://www.cnbc.com/economy/', 30),
