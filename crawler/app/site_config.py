@@ -184,7 +184,12 @@ class SiteConfig:
         tpl = self.pagination.get("url")
         if not tpl:
             return None
-        values = {"page": page, "listing_url": listing_url.rstrip("/")}
+        url_no_ext = re.sub(r"\.html?$", "", listing_url.rstrip("/"))
+        values = {
+            "page": page,
+            "listing_url": listing_url.rstrip("/"),
+            "url_no_ext": url_no_ext,
+        }
         for var, pattern in (self.pagination.get("vars") or {}).items():
             m = re.search(pattern, page1_html or "")
             if not m:

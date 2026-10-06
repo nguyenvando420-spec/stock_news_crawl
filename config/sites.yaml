@@ -69,6 +69,11 @@ sites:
     base_url: https://cafef.vn
     listing_urls:
       - https://cafef.vn/thi-truong-chung-khoan.chn
+      - https://cafef.vn/doanh-nghiep.chn
+      - https://cafef.vn/tai-chinh-ngan-hang.chn
+      - https://cafef.vn/bat-dong-san.chn
+      - https://cafef.vn/vi-mo-dau-tu.chn
+      - https://cafef.vn/tai-chinh-quoc-te.chn
     article_url_pattern: '^https://cafef\.vn/[a-z0-9-]+-\d{15,}\.chn$'
     listing:
       blocks:                   # tên khối -> selector của TỪNG item tin trong vùng nội dung chính
@@ -105,6 +110,11 @@ sites:
     base_url: https://vietstock.vn
     listing_urls:
       - https://vietstock.vn/chung-khoan.htm
+      - https://vietstock.vn/doanh-nghiep.htm
+      - https://vietstock.vn/bat-dong-san.htm
+      - https://vietstock.vn/hang-hoa.htm
+      - https://vietstock.vn/kinh-te.htm
+      - https://vietstock.vn/the-gioi.htm
     article_url_pattern: '^https://vietstock\.vn/\d{4}/\d{2}/[a-z0-9-]+-\d+-\d+\.htm$'
     listing:
       blocks:
@@ -133,6 +143,10 @@ sites:
     base_url: https://www.tinnhanhchungkhoan.vn
     listing_urls:
       - https://www.tinnhanhchungkhoan.vn/chung-khoan/
+      - https://www.tinnhanhchungkhoan.vn/vi-mo/
+      - https://www.tinnhanhchungkhoan.vn/thong-tin-doanh-nghiep/
+      - https://www.tinnhanhchungkhoan.vn/tai-chinh-ngan-hang/
+      - https://www.tinnhanhchungkhoan.vn/quoc-te/
     article_url_pattern: '^https://www\.tinnhanhchungkhoan\.vn/[a-z0-9-]+-post\d+\.html$'
     listing:
       blocks:
@@ -163,6 +177,10 @@ sites:
     base_url: https://nguoiquansat.vn
     listing_urls:
       - https://nguoiquansat.vn/chung-khoan
+      - https://nguoiquansat.vn/doanh-nghiep
+      - https://nguoiquansat.vn/tai-chinh-ngan-hang
+      - https://nguoiquansat.vn/bat-dong-san
+      - https://nguoiquansat.vn/the-gioi
     article_url_pattern: '^https://nguoiquansat\.vn/[a-z0-9-]+-\d{5,}\.html$'
     listing:
       blocks:
@@ -191,6 +209,49 @@ sites:
         author:   "span.block-sc-author"
         category: "span.block-sc-cate-name"
         tags:     "div.c-tags a"
+
+  # ---------------------------------------------------------------------------
+  vietnambiz:
+    name: VietnamBiz
+    base_url: https://vietnambiz.vn
+    listing_urls:
+      - https://vietnambiz.vn/chung-khoan.htm
+      - https://vietnambiz.vn/doanh-nghiep.htm
+      - https://vietnambiz.vn/tai-chinh.htm
+      - https://vietnambiz.vn/nha-dat.htm
+      - https://vietnambiz.vn/hang-hoa.htm
+      - https://vietnambiz.vn/quoc-te.htm
+    article_url_pattern: '^https://vietnambiz\.vn/[a-z0-9-]+-\d{10,}\.htm$'
+    listing:
+      blocks:
+        featured: "div.box-highlight, div.list-item-inner div.item"
+        stream: "div.news-stream div.list-news div.item"
+      item:
+        href:  ["h3.title a@href", "h2.title a@href", "a.title@href", "a@href"]
+        title: ["h3.title a", "h2.title a", "a.title", "a@title"]
+        sapo:  [".sapo", "p"]
+        thumbnail_url: ["img@src", "img@data-src"]
+        published_at: ["span.timeago@title", "span.need-get-timeago@title", "span.timeago"]
+    pagination:
+      type: url
+      url: "{url_no_ext}/trang-{page}.htm"
+    article:
+      content: "div.vnbcbc-body, div.article-body-content"
+      exclude:
+        - ".box-tag-detail"
+        - ".link-source-detail"
+        - ".special-footer-detail"
+        - ".box-related"
+        - "[class*='banner'], [class*='ads']"
+        - ".vnbcba-social, .sharing"
+      fields:
+        title:           ["h1.title-detail", "h1[data-role='title']", "h1"]
+        sapo:            ["div.sapo-detail", "div[data-role='sapo']", ".sapo"]
+        author:          ["span.author-detail", "span.author"]
+        published_at:    ["span.time-detail", "meta[property='article:published_time']@content"]
+        category:        ["meta[property='article:section']@content", ".category"]
+        original_source: [".link-source-detail a", "[data-field='source']"]
+        tags:            ["div.box-tag-detail a"]
 
   # ---------------------------------------------------------------------------
   reuters:

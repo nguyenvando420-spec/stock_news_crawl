@@ -45,6 +45,14 @@ SOURCE_CONFIGS = {
         "badge_border": "rgba(6, 182, 212, 0.35)",
         "url": "https://tinnhanhchungkhoan.vn",
     },
+    "vietnambiz": {
+        "id": "vietnambiz",
+        "name": "VietnamBiz",
+        "color": "#ef4444",
+        "badge_bg": "rgba(239, 68, 68, 0.15)",
+        "badge_border": "rgba(239, 68, 68, 0.35)",
+        "url": "https://vietnambiz.vn",
+    },
 }
 
 

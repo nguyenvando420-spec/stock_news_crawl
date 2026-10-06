@@ -71,6 +71,7 @@ services:
       TZ: Asia/Ho_Chi_Minh
     volumes:
       - ./config:/opt/crawler/config:ro
+      - ./crawler/app:/opt/crawler/app:ro
     # Chromium cần shared memory lớn, tránh crash khi mở nhiều tab
     shm_size: 1gb
     depends_on:
