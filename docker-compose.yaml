@@ -80,6 +80,30 @@ services:
       - crawl-net
     logging: *default-logging
 
+  # ========================================================
+  # 3. WEB PORTAL (FastAPI + Modern Web UI)
+  # ========================================================
+  web:
+    build:
+      context: ./web
+      dockerfile: Dockerfile
+    image: stock-news-web:latest
+    restart: unless-stopped
+    ports:
+      - "${WEB_PORT:-8000}:8000"
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-crawl4ai_password_2026}@postgres:5432/${POSTGRES_DB:-news_db}
+      TZ: Asia/Ho_Chi_Minh
+    volumes:
+      - ./web/app:/app/app
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - crawl-net
+    logging: *default-logging
+
+
 networks:
   crawl-net:
     driver: bridge

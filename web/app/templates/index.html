@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="vi" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>VNStock News - Cổng Tổng Hợp Tin Tức Chứng Khoán Việt Nam</title>
+  <meta name="description" content="Theo dõi và cập nhật liên tục tin tức thị trường chứng khoán Việt Nam từ CafeF, Vietstock, Người Quan Sát, Tin Nhanh Chứng Khoán.">
+  
+  <!-- Google Fonts: Plus Jakarta Sans & JetBrains Mono -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  
+  <!-- Custom CSS -->
+  <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+
+  <!-- Site Header -->
+  <header class="site-header">
+    <div class="container">
+      <div class="header-inner">
+        
+        <!-- Brand / Logo -->
+        <a href="/" class="brand-wrapper" id="brandLogo">
+          <div class="brand-logo-icon">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="22 7 13.5 15.5 8.5 10.5 2 17"></polyline>
+              <polyline points="16 7 22 7 22 13"></polyline>
+            </svg>
+          </div>
+          <div class="brand-text">
+            <h1>VNSTOCK NEWS</h1>
+            <p>Trực Tiếp Thị Trường Tài Chính</p>
+          </div>
+        </a>
+
+        <!-- Live Pulse Indicator -->
+        <div class="live-badge" title="Dữ liệu đồng bộ trực tiếp từ PostgreSQL">
+          <span class="pulse-dot"></span>
+          <span>LIVE FEED</span>
+        </div>
+
+        <!-- Header Actions: Refresh & Dark/Light Toggle -->
+        <div class="header-actions">
+          <button class="refresh-btn" id="refreshBtn" title="Tải lại trang">
+            <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+          </button>
+          
+          <button class="theme-toggle-btn" id="themeToggleBtn" title="Đổi giao diện Sáng / Tối">
+            <!-- Icon JS tự thay thế -->
+          </button>
+        </div>
+
+      </div>
+    </div>
+  </header>
+
+  <!-- Metrics & Stats Bar -->
+  <section class="stats-banner">
+    <div class="container">
+      <div class="stats-grid">
+        <div class="stat-item">
+          <span>📰 Tổng số bài:</span>
+          <span class="stat-val">{{ stats.total_articles }}</span>
+        </div>
+        <div class="stat-item">
+          <span>⚡ Hôm nay:</span>
+          <span class="stat-val highlight">+{{ stats.today_articles }} bài mới</span>
+        </div>
+        <div class="stat-item">
+          <span>⏱️ Cập nhật gần nhất:</span>
+          <span class="stat-val">{{ stats.latest_crawled_at | relative_time }}</span>
+        </div>
+        <div class="stat-item">
+          <span>🔄 Tần suất thu thập:</span>
+          <span class="stat-val">Mỗi 10 phút</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Main Content & Filters -->
+  <main class="container" style="flex: 1;">
+    
+    <!-- Controls Section -->
+    <section class="controls-section">
+      
+      <!-- Search & Date Filter Row -->
+      <div class="search-filter-row">
+        
+        <!-- Search Input -->
+        <div class="search-box">
+          <span class="search-icon">
+            <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+          </span>
+          <input
+            type="text"
+            id="searchInput"
+            class="search-input"
+            placeholder="Tìm theo tiêu đề, mã cổ phiếu (NVL, PNJ, VIC...)... (Nhấn /)"
+            value="{{ active_q }}"
+            autocomplete="off"
+          >
+          <button type="button" id="clearSearchBtn" class="clear-search-btn" title="Xóa tìm kiếm">✕</button>
+        </div>
+
+        <!-- Date Filter Dropdown -->
+        <div class="filter-controls">
+          <select id="dateFilterSelect" class="custom-select" aria-label="Lọc theo thời gian">
+            <option value="" {% if not active_date %}selected{% endif %}>📅 Tất cả thời gian</option>
+            <option value="today" {% if active_date == 'today' %}selected{% endif %}>⚡ Hôm nay</option>
+            <option value="3days" {% if active_date == '3days' %}selected{% endif %}>🕒 3 ngày qua</option>
+            <option value="7days" {% if active_date == '7days' %}selected{% endif %}>📆 7 ngày qua</option>
+          </select>
+        </div>
+
+      </div>
+
+      <!-- Source Tabs -->
+      <div class="source-tabs" id="sourceTabs">
+        <button
+          type="button"
+          class="source-tab {% if not active_source %}active{% endif %}"
+          data-source="all"
+          id="tab-source-all"
+        >
+          <span>Tất cả nguồn</span>
+          <span class="source-tab-count">{{ stats.total_articles }}</span>
+        </button>
+
+        {% for src in sources %}
+        <button
+          type="button"
+          class="source-tab {% if active_source == src.id %}active{% endif %}"
+          data-source="{{ src.id }}"
+          id="tab-source-{{ src.id }}"
+        >
+          <span class="source-badge-dot" style="background-color: {{ src.color }};"></span>
+          <span>{{ src.name }}</span>
+          <span class="source-tab-count">{{ src.count }}</span>
+        </button>
+        {% endfor %}
+      </div>
+
+    </section>
+
+    <!-- Articles Section -->
+    <section class="articles-section">
+      
+      {% if articles and articles|length > 0 %}
+      <div class="articles-grid" id="articlesGrid">
+        {% for a in articles %}
+        <article class="article-card" id="article-card-{{ a.id }}">
+          
+          <!-- Card Thumbnail / Media -->
+          <div class="card-media" onclick="openArticleModal({{ a.id }})">
+            {% if a.thumbnail_url %}
+            <img src="{{ a.thumbnail_url }}" alt="{{ a.title }}" class="card-thumb" loading="lazy" onerror="this.onerror=null; this.parentElement.innerHTML='<div class=\'card-thumb-fallback\'><span>📈 VNSTOCK</span></div>';">
+            {% else %}
+            <div class="card-thumb-fallback">
+              <span>📈 {{ a.source_name }}</span>
+            </div>
+            {% endif %}
+
+            <!-- Badges -->
+            <div
+              class="card-source-badge"
+              style="color: {{ a.source_color }}; background-color: {{ a.source_badge_bg }}; border-color: {{ a.source_badge_border }};"
+            >
+              {{ a.source_name }}
+            </div>
+
+            {% if a.category %}
+            <div class="card-category-tag">
+              {{ a.category }}
+            </div>
+            {% endif %}
+          </div>
+
+          <!-- Card Body -->
+          <div class="card-body">
+            
+            <div class="card-meta-top">
+              <span class="card-time" title="{{ a.published_at | datetime_vn }}">
+                🕒 {{ a.published_at | relative_time }}
+              </span>
+              {% if a.word_count %}
+              <span class="card-words">
+                {{ a.word_count }} từ
+              </span>
+              {% endif %}
+            </div>
+
+            <h2 class="card-title" onclick="openArticleModal({{ a.id }})" title="{{ a.title }}">
+              {{ a.title }}
+            </h2>
+
+            {% if a.sapo %}
+            <p class="card-sapo">{{ a.sapo }}</p>
+            {% endif %}
+
+            <!-- Tag chips -->
+            {% if a.tags and a.tags|length > 0 %}
+            <div class="card-tags">
+              {% for tag in a.tags[:3] %}
+              <span class="tag-chip" onclick="searchTag('{{ tag }}')">#{{ tag }}</span>
+              {% endfor %}
+            </div>
+            {% endif %}
+
+            <!-- Card Footer -->
+            <div class="card-footer">
+              <button type="button" class="read-btn" onclick="openArticleModal({{ a.id }})">
+                <span>Đọc nhanh</span>
+                <span>→</span>
+              </button>
+              
+              <a href="{{ a.url }}" target="_blank" rel="noopener noreferrer" class="original-link" title="Mở bài viết gốc trên {{ a.source_name }}">
+                <span>Bài gốc</span>
+                <span>↗</span>
+              </a>
+            </div>
+
+          </div>
+
+        </article>
+        {% endfor %}
+      </div>
+
+      <!-- Pagination -->
+      {% if pagination.total_pages > 1 %}
+      <nav class="pagination-wrapper" aria-label="Phân trang">
+        <!-- Prev Button -->
+        <a
+          href="?page={{ pagination.page - 1 }}{% if active_source %}&source={{ active_source }}{% endif %}{% if active_q %}&q={{ active_q }}{% endif %}{% if active_date %}&date={{ active_date }}{% endif %}"
+          class="page-btn {% if not pagination.has_prev %}disabled{% endif %}"
+          {% if not pagination.has_prev %}style="pointer-events: none; opacity: 0.3;"{% endif %}
+        >
+          &larr; Trước
+        </a>
+
+        <!-- Page numbers -->
+        {% for p in range(1, pagination.total_pages + 1) %}
+          {% if p == pagination.page %}
+          <span class="page-btn active">{{ p }}</span>
+          {% elif p <= 3 or p >= pagination.total_pages - 1 or (p >= pagination.page - 1 and p <= pagination.page + 1) %}
+          <a
+            href="?page={{ p }}{% if active_source %}&source={{ active_source }}{% endif %}{% if active_q %}&q={{ active_q }}{% endif %}{% if active_date %}&date={{ active_date }}{% endif %}"
+            class="page-btn"
+          >
+            {{ p }}
+          </a>
+          {% elif p == 4 or p == pagination.total_pages - 2 %}
+          <span class="page-btn" style="border: none; background: none; cursor: default;">...</span>
+          {% endif %}
+        {% endfor %}
+
+        <!-- Next Button -->
+        <a
+          href="?page={{ pagination.page + 1 }}{% if active_source %}&source={{ active_source }}{% endif %}{% if active_q %}&q={{ active_q }}{% endif %}{% if active_date %}&date={{ active_date }}{% endif %}"
+          class="page-btn {% if not pagination.has_next %}disabled{% endif %}"
+          {% if not pagination.has_next %}style="pointer-events: none; opacity: 0.3;"{% endif %}
+        >
+          Sau &rarr;
+        </a>
+      </nav>
+      {% endif %}
+
+      {% else %}
+      <!-- Empty State -->
+      <div class="empty-state">
+        <div class="empty-icon">🔍</div>
+        <h3>Không tìm thấy bài viết nào</h3>
+        <p style="margin-top: 0.5rem;">Hãy thử tìm kiếm bằng từ khóa khác hoặc xóa bộ lọc nguồn/thời gian.</p>
+        <button
+          type="button"
+          onclick="window.location.href='/'"
+          class="modal-btn primary"
+          style="margin-top: 1.5rem;"
+        >
+          Xem tất cả bài viết
+        </button>
+      </div>
+      {% endif %}
+
+    </section>
+
+  </main>
+
+  <!-- Article Reader Modal Dialog -->
+  <div class="modal-backdrop" id="articleModal" role="dialog" aria-modal="true" aria-hidden="true">
+    <div class="modal-container">
+      
+      <!-- Modal Header -->
+      <div class="modal-header">
+        <div class="modal-header-meta">
+          <span class="card-source-badge" id="modalSourceBadge">NGUỒN TIN</span>
+        </div>
+
+        <div class="modal-actions">
+          <button type="button" class="modal-btn" id="modalCopyLinkBtn" title="Sao chép link gốc bài viết">
+            <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+            </svg>
+            <span>Sao chép link</span>
+          </button>
+
+          <a href="#" target="_blank" rel="noopener noreferrer" class="modal-btn primary" id="modalArticleOriginalBtn">
+            <span>Mở bài gốc</span>
+            <span>↗</span>
+          </a>
+
+          <button type="button" class="modal-close-btn" id="modalCloseBtn" title="Đóng (ESC)">
+            ✕
+          </button>
+        </div>
+      </div>
+
+      <!-- Modal Body -->
+      <div class="modal-body" id="modalBody">
+        <!-- Content will be rendered dynamically -->
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Site Footer -->
+  <footer class="site-footer">
+    <div class="container">
+      <div class="footer-inner">
+        <div>
+          <strong>VNStock News Portal</strong> &bull; Hệ thống tổng hợp tin tức tài chính chứng khoán tự động.
+        </div>
+        <div>
+          Cơ sở dữ liệu: <strong>PostgreSQL 16</strong> | Thu thập: <strong>Crawl4AI</strong>
+        </div>
+      </div>
+    </div>
+  </footer>
+
+  <!-- Application Script -->
+  <script src="/static/js/app.js"></script>
+</body>
+</html>

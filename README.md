@@ -33,7 +33,7 @@ Crawl tin tức tài chính chỉ bằng **[Crawl4AI](https://github.com/uncleco
 ```text
 .
 ├── config/sites.yaml          # ★ cấu hình TẤT CẢ website (mount vào container)
-├── docker-compose.yaml        # postgres + crawler
+├── docker-compose.yaml        # postgres + crawler + web portal
 ├── init-db.sql                # schema: articles, crawl_runs
 ├── crawler/
 │   ├── Dockerfile             # FROM unclecode/crawl4ai:0.8.6 (+ psycopg)
@@ -43,6 +43,14 @@ Crawl tin tức tài chính chỉ bằng **[Crawl4AI](https://github.com/uncleco
 │       ├── window.py          # khoảng ngày cần lấy (hôm nay / ngày / khoảng ngày)
 │       ├── crawl.py           # pipeline Crawl4AI chung cho mọi site
 │       └── db.py              # PostgreSQL (psycopg 3 async)
+├── web/                       # ★ Giao diện Web Portal (FastAPI + Modern UI)
+│   ├── Dockerfile
+│   ├── requirements.txt
+│   └── app/
+│       ├── main.py            # API FastAPI & Route điều khiển
+│       ├── db.py              # Pool kết nối & query PostgreSQL
+│       ├── static/            # CSS Design System & JS tương tác
+│       └── templates/         # Giao diện HTML5 (Dark/Light mode, Reader modal)
 └── scripts/show_db.sh
 ```
 
@@ -50,9 +58,11 @@ Crawl tin tức tài chính chỉ bằng **[Crawl4AI](https://github.com/uncleco
 
 ```bash
 cp .env.example .env
-docker compose build crawler
-docker compose up -d            # JOB: postgres + crawler chạy nền, mỗi 10 phút lấy bài ĐĂNG HÔM NAY
+docker compose up -d            # Chạy toàn bộ: postgres + crawler + web portal
 docker compose logs -f crawler
+
+# Mở trình duyệt xem tin tức trực tiếp:
+# 👉 http://localhost:8000
 
 # Dữ liệu lịch sử: chạy tay, truyền ngày (tự phân trang lùi tới khi qua mốc ngày)
 docker compose run --rm crawler --date 2026-10-01                    # 1 ngày
