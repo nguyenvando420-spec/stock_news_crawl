@@ -1,73 +1,24 @@
-name: crawl4ai-n8n-pipeline
+name: stock-news-crawl4ai
+
+# Stack tối giản: Crawl4AI (Python SDK + Chromium headless) -> PostgreSQL
+#
+#   docker compose up -d                                    # JOB: postgres + crawler chạy nền, mỗi 10 phút lấy bài đăng HÔM NAY
+#   CRAWL_INTERVAL_MINUTES=15 docker compose up -d          # đổi chu kỳ
+#   docker compose logs -f crawler                          # xem log
+#
+#   Dữ liệu lịch sử - chạy tay 1 lần, truyền ngày đăng:
+#   docker compose run --rm crawler --date 2026-10-01
+#   docker compose run --rm crawler --from 2026-09-25 --to 2026-09-30 --site cafef
+#
+#   Khác (truyền tham số => ghi đè command, không lặp):
+#   docker compose run --rm crawler --list-sites            # các site trong config/sites.yaml
+#   docker compose run --rm crawler --dry-run --today       # xem trước link + ngày đăng
+#
+# Thêm/sửa website: chỉ sửa config/sites.yaml (được mount vào container, không cần build lại).
 
 services:
   # ========================================================
-  # 1. ORCHESTRATION & AUTOMATION (n8n)
-  # ========================================================
-  n8n:
-    image: docker.n8n.io/n8nio/n8n:latest
-    restart: unless-stopped
-    ports:
-      - "${N8N_PORT:-5679}:5678"
-    environment:
-      - N8N_HOST=${N8N_HOST:-localhost}
-      - N8N_PORT=5678
-      - N8N_PROTOCOL=${N8N_PROTOCOL:-http}
-      - NODE_ENV=production
-      - WEBHOOK_URL=${WEBHOOK_URL:-http://localhost:5679/}
-      - GENERIC_TIMEZONE=${GENERIC_TIMEZONE:-Asia/Ho_Chi_Minh}
-      - TZ=Asia/Ho_Chi_Minh
-      - N8N_ENCRYPTION_KEY=${N8N_ENCRYPTION_KEY:-n8n_crawl4ai_secret_key_2026}
-      # Sử dụng PostgreSQL lưu trữ dữ liệu n8n
-      - DB_TYPE=postgresdb
-      - DB_POSTGRESDB_HOST=postgres
-      - DB_POSTGRESDB_PORT=5432
-      - DB_POSTGRESDB_DATABASE=${POSTGRES_DB:-news_db}
-      - DB_POSTGRESDB_USER=${POSTGRES_USER:-postgres}
-      - DB_POSTGRESDB_PASSWORD=${POSTGRES_PASSWORD:-crawl4ai_password_2026}
-      - DB_POSTGRESDB_SCHEMA=n8n
-      # Tự động dọn dẹp lịch sử execution tránh đầy ổ cứng
-      - EXECUTIONS_DATA_PRUNE=true
-      - EXECUTIONS_DATA_MAX_AGE=168
-      - EXECUTIONS_DATA_PRUNE_MAX_COUNT=50000
-      - CRAWL4AI_API_TOKEN=${CRAWL4AI_API_TOKEN:-crawl4ai_secret_token_2026}
-    volumes:
-      - n8n_data:/home/node/.n8n
-    depends_on:
-      postgres:
-        condition: service_healthy
-      crawl4ai:
-        condition: service_started
-    networks:
-      - crawl4ai-net
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
-
-  # ========================================================
-  # 2. CRAWLER ENGINE (Crawl4AI REST API)
-  # ========================================================
-  crawl4ai:
-    image: unclecode/crawl4ai:0.8.6
-    restart: unless-stopped
-    ports:
-      - "${CRAWL4AI_PORT:-11235}:11235"
-    environment:
-      - CRAWL4AI_API_TOKEN=${CRAWL4AI_API_TOKEN:-crawl4ai_secret_token_2026}
-    # Cấp đủ shared memory cho Playwright Chromium tránh crash trang nặng
-    shm_size: 1gb
-    networks:
-      - crawl4ai-net
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
-
-  # ========================================================
-  # 3. DATABASE (PostgreSQL)
+  # 1. DATABASE (PostgreSQL)
   # ========================================================
   postgres:
     image: postgres:16
@@ -76,29 +27,62 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-crawl4ai_password_2026}
       POSTGRES_DB: ${POSTGRES_DB:-news_db}
+      TZ: Asia/Ho_Chi_Minh
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./init-db.sql:/docker-entrypoint-initdb.d/init-db.sql:ro
     ports:
-      - "${POSTGRES_PORT:-5434}:5432"
+      - "${POSTGRES_PORT:-5433}:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-news_db}"]
       interval: 5s
       timeout: 5s
-      retries: 5
+      retries: 10
       start_period: 5s
     networks:
-      - crawl4ai-net
-    logging:
+      - crawl-net
+    logging: &default-logging
       driver: "json-file"
       options:
         max-size: "10m"
         max-file: "3"
 
+  # ========================================================
+  # 2. CRAWLER (Crawl4AI Python SDK, build từ unclecode/crawl4ai:0.8.6)
+  # ========================================================
+  crawler:
+    build:
+      context: .
+      dockerfile: crawler/Dockerfile
+    image: stock-news-crawl4ai-crawler:latest
+    restart: unless-stopped
+    # Job định kỳ: chỉ lấy bài ĐĂNG HÔM NAY; URL đã có trong DB sẽ bị bỏ qua (trừ khi --force)
+    command: ["--today", "--interval-minutes", "${CRAWL_INTERVAL_MINUTES:-10}"]
+    # Image gốc có HEALTHCHECK gọi API server :11235 - service này chỉ dùng SDK nên tắt đi
+    healthcheck:
+      disable: true
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-crawl4ai_password_2026}@postgres:5432/${POSTGRES_DB:-news_db}
+      CRAWL_SITES: ${CRAWL_SITES:-}          # rỗng = mọi site enabled; vd: cafef,vietstock
+      CRAWL_PAGES: ${CRAWL_PAGES:-1}
+      CRAWL_MAX_ARTICLES: ${CRAWL_MAX_ARTICLES:-30}
+      CRAWL_CONCURRENCY: ${CRAWL_CONCURRENCY:-3}
+      CRAWL_MAX_PAGES: ${CRAWL_MAX_PAGES:-50}   # giới hạn số trang listing khi lọc theo ngày
+      TZ: Asia/Ho_Chi_Minh
+    volumes:
+      - ./config:/opt/crawler/config:ro
+    # Chromium cần shared memory lớn, tránh crash khi mở nhiều tab
+    shm_size: 1gb
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - crawl-net
+    logging: *default-logging
+
 networks:
-  crawl4ai-net:
+  crawl-net:
     driver: bridge
 
 volumes:
-  n8n_data:
   postgres_data:

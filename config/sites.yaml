@@ -1,0 +1,222 @@
+# =============================================================================
+#  CẤU HÌNH WEBSITE CHO CRAWLER (Crawl4AI)
+#  Thêm website mới = thêm 1 block dưới `sites:`. KHÔNG cần sửa code Python.
+#  File này được mount vào container (docker-compose) -> sửa xong chạy lại là có hiệu lực.
+#
+#  CÚ PHÁP SELECTOR (dùng cho listing.item.* và article.fields.*):
+#    "h1.title"                         -> lấy TEXT của phần tử đầu tiên khớp
+#    "meta[property='og:image']@content"-> lấy THUỘC TÍNH `content`
+#    "@href"                            -> thuộc tính của chính phần tử item
+#    [sel1, sel2, ...]                  -> danh sách ƯU TIÊN: thử lần lượt, lấy giá trị đầu tiên khác rỗng
+#  Riêng `tags`: selector không có @ -> lấy text của MỌI phần tử khớp;
+#                selector có @       -> lấy 1 giá trị rồi tách theo dấu phẩy (vd meta keywords).
+#
+#  THỨ TỰ ƯU TIÊN khi điền metadata bài viết:
+#    1. article.fields của site   2. JSON-LD NewsArticle trong trang   3. article.fields của defaults
+# =============================================================================
+
+defaults:
+  enabled: true
+  timezone: "+07:00"            # dùng khi ngày đăng không có múi giờ
+  date_formats:                 # định dạng ngày ngoài ISO-8601 (strptime). Ngoài ra tự hiểu: "8 phút trước",
+    - "%d/%m/%Y %H:%M"           # "1h trước", "hôm qua 20:30", "3 hours ago"
+    - "%d/%m/%Y - %H:%M"
+    - "%d/%m/%Y %H:%M:%S"
+    - "%d-%m-%Y %H:%M:%S%z"
+    - "%d-%m-%Y - %H:%M %p"
+    - "%d/%m %H:%M"             # thiếu năm -> năm hiện tại (hoặc năm trước nếu rơi vào tương lai)
+  min_words: 50                 # bài ít hơn N từ -> coi là lỗi (layout lạ, video...)
+
+  browser:
+    text_mode: true             # không tải ảnh -> nhanh
+    enable_stealth: true
+    undetected: false           # true -> dùng UndetectedAdapter (patchright) cho site chống bot
+    headers:
+      Accept-Language: "vi-VN,vi;q=0.9,en;q=0.8"
+
+  listing:
+    item:
+      href:  ["h1 a@href", "h2 a@href", "h3 a@href", "h4 a@href", "a@href"]
+      title: ["h1 a", "h2 a", "h3 a", "h4 a", "a@title"]
+      sapo:  [".sapo", "p"]
+      thumbnail_url: ["img@data-src", "img@src"]
+      # Ngày đăng hiển thị ngay trên trang listing (tuỳ chọn). Có thì lọc theo ngày mà không cần mở bài;
+      # không có thì crawler mở bài để đọc ngày (chậm hơn nhưng vẫn đúng).
+      published_at: ["time@datetime", "time"]
+
+  article:
+    # Luôn loại bỏ khỏi khung nội dung (cộng dồn với exclude của site).
+    # CẢNH BÁO: excluded_selector chạy trên TOÀN trang trước khi chọn khung nội dung.
+    # Selector quá rộng (vd [class*='banner']) có thể khớp thẻ CHA của bài -> mất cả nội dung.
+    exclude:
+      - "[id^='admzone']"
+      - "[class^='ads_'], [id^='ads_']"
+      - ".social-share, .sharing"
+    fields:                     # fallback chung từ thẻ <meta>
+      title:         ["meta[property='og:title']@content", "h1"]
+      sapo:          ["meta[name='description']@content", "meta[property='og:description']@content"]
+      author:        ["meta[property='article:author']@content", "meta[name='author']@content"]
+      published_at:  ["meta[property='article:published_time']@content", "meta[itemprop='datePublished']@content"]
+      category:      ["meta[property='article:section']@content"]
+      canonical_url: ["link[rel='canonical']@href", "meta[property='og:url']@content"]
+      thumbnail_url: ["meta[property='og:image']@content"]
+      tags:          ["meta[property='article:tag']@content", "meta[name='keywords']@content", "meta[name='news_keywords']@content"]
+
+sites:
+  # ---------------------------------------------------------------------------
+  cafef:
+    name: CafeF
+    base_url: https://cafef.vn
+    listing_urls:
+      - https://cafef.vn/thi-truong-chung-khoan.chn
+    article_url_pattern: '^https://cafef\.vn/[a-z0-9-]+-\d{15,}\.chn$'
+    listing:
+      blocks:                   # tên khối -> selector của TỪNG item tin trong vùng nội dung chính
+        featured: "div.firstitem, div.cate-hl-row2 div.big"
+        stream: "div.list-news div.box-category-item, div.box-category-item"
+      item:
+        published_at: [".time@title", ".time"]   # stream: span.time@title ISO; featured: p.time "06/10/2026 - 00:01"
+    pagination:                 # trang 2+ CafeF nạp bằng AJAX
+      type: url
+      url: "https://cafef.vn/timelinelist/{zone_id}/{page}.chn"
+      vars:                     # biến lấy bằng regex từ HTML trang 1
+        zone_id: 'newsinzone:zone(\d+)'
+    article:
+      content: "div.detail-content"
+      exclude:
+        - ".tindnd"
+        - "#listNewsInContent"
+        - ".h-show-pc, .h-show-mobile"
+        - ".link-content-footer"
+        - ".VCSortableInPreviewMode[type='link'], .VCSortableInPreviewMode[type='RelatedNews']"
+        - ".link-source-wrapper, .bottom-info, .sharemxh"
+      fields:
+        title:           "h1[data-role='title']"
+        sapo:            "[data-role='sapo']"
+        author:          "[data-role='author']"
+        published_at:    "[data-role='publishdate']@datetime"
+        category:        "[data-role='cate-name']"
+        original_source: "[data-field='source']"
+        tags:            ".tagdetail .row2 a"
+
+  # ---------------------------------------------------------------------------
+  vietstock:
+    name: Vietstock
+    base_url: https://vietstock.vn
+    listing_urls:
+      - https://vietstock.vn/chung-khoan.htm
+    article_url_pattern: '^https://vietstock\.vn/\d{4}/\d{2}/[a-z0-9-]+-\d+-\d+\.htm$'
+    listing:
+      blocks:
+        stream: "#channel-container div.single_post"
+      item:
+        published_at: ".meta3 a:last-child"      # "8 phút trước" | "05/10 20:30"
+    pagination:                 # phân trang bằng JS (href="javascript:void(0)") -> bấm nút trong cùng phiên trình duyệt
+      type: click
+      selector: "#content-paging a[page='{page}']"
+    article:
+      content: "#vst_detail"
+      exclude:
+        - "p.pTitle"            # tiêu đề lặp lại
+        - "p.pHead"             # sapo (đã lưu cột riêng)
+        - "p.pAuthor, p.pSource"
+      fields:
+        title:           "h1.article-title"
+        sapo:            "#vst_detail p.pHead"
+        author:          "#vst_detail p.pAuthor"
+        original_source: "#vst_detail p.pSource"
+        tags:            "div.tags a"
+
+  # ---------------------------------------------------------------------------
+  tinnhanhchungkhoan:
+    name: Tin nhanh chứng khoán
+    base_url: https://www.tinnhanhchungkhoan.vn
+    listing_urls:
+      - https://www.tinnhanhchungkhoan.vn/chung-khoan/
+    article_url_pattern: '^https://www\.tinnhanhchungkhoan\.vn/[a-z0-9-]+-post\d+\.html$'
+    listing:
+      blocks:
+        featured: ".category-highlight article.story"
+        stream: ".category-timeline article.story"
+      item:                     # trang 1 dùng h2, các item nạp thêm qua "Xem thêm" dùng h3
+        href:  ".story__heading a@href"
+        title: ".story__heading a"
+        sapo:  ".story__summary"
+        published_at: ["time@datetime", "time"]  # "2026-10-06T08:00:08+0700"
+    pagination:
+      type: click
+      selector: ".category-timeline .control__loadmore"
+    article:
+      content: "div.article__body"
+      exclude:
+        - ".ads_middle"
+        - ".article__tag, .article__social"
+      fields:
+        title:  "h1.article__title, h1"
+        sapo:   "div.article__sapo"
+        author: ".article__meta .cms-author"
+        tags:   "div.article__tag a"
+
+  # ---------------------------------------------------------------------------
+  nguoiquansat:
+    name: Người Quan Sát
+    base_url: https://nguoiquansat.vn
+    listing_urls:
+      - https://nguoiquansat.vn/chung-khoan
+    article_url_pattern: '^https://nguoiquansat\.vn/[a-z0-9-]+-\d{5,}\.html$'
+    listing:
+      blocks:
+        featured: ".c-head div.b-grid"
+        stream: ".c-template-list ul.onecms__loading > li div.b-grid"
+      item:
+        href:  ["h2.b-grid__title a@href", "h3.b-grid__title a@href", "a@href"]
+        title: ["h2.b-grid__title a", "h3.b-grid__title a"]
+        sapo:  ".b-grid__desc"
+        published_at: ".b-grid__time@data-time"  # chỉ vài item có -> còn lại đọc ngày trong bài
+    date_formats:
+      - "%m/%d/%Y %I:%M:%S %p"  # data-time kiểu Mỹ: "10/6/2026 8:00:01 AM"
+    pagination:
+      type: click
+      selector: ".onecms__loadmore a"
+    article:
+      content: "article.entry"
+      exclude:
+        - ".sc-longform-header"   # tiêu đề + tác giả + sapo (đã lưu cột riêng)
+        - ".c-box"                # quảng cáo
+        - ".c-tags, .sc-empty-layer"
+        - ".c-news-related, .c-related, .box-related"
+      fields:
+        title:    "h1.block-sc-title, h1"
+        sapo:     "p.block-sc-sapo"
+        author:   "span.block-sc-author"
+        category: "span.block-sc-cate-name"
+        tags:     "div.c-tags a"
+
+  # ---------------------------------------------------------------------------
+  reuters:
+    # Reuters dùng DataDome anti-bot: Chromium headless (kể cả undetected) bị trả 401 + captcha.
+    # Đã TẮT. Muốn thử: bật enabled, đặt browser.cdp_url tới Chrome thật của bạn
+    # (chrome --remote-debugging-port=9222) hoặc dùng proxy dân cư - và tự kiểm tra điều khoản sử dụng.
+    enabled: false
+    name: Reuters
+    base_url: https://www.reuters.com
+    timezone: "+00:00"
+    listing_urls:
+      - https://www.reuters.com/business/
+    article_url_pattern: '^https://www\.reuters\.com/business/[a-z0-9-]+/[a-z0-9-]+-\d{4}-\d{2}-\d{2}/$'
+    browser:
+      undetected: true
+      headers:
+        Accept-Language: "en-US,en;q=0.9"
+    listing:
+      blocks:
+        stream: "[data-testid='MediaStoryCard'], [data-testid='StoryCard'], li[class*='story-collection']"
+      item:
+        href:  ["a[data-testid='TitleLink']@href", "a@href"]
+        title: ["[data-testid='TitleHeading']", "a[data-testid='TitleLink']"]
+    article:
+      content: "[data-testid='ArticleBody'], article"
+      exclude:
+        - "[data-testid='Toolbar'], [data-testid='promo-box'], [class*='read-next']"
+      fields:
+        author: "[data-testid='AuthorNameLink'], a[rel='author']"
