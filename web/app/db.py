@@ -53,6 +53,14 @@ SOURCE_CONFIGS = {
         "badge_border": "rgba(239, 68, 68, 0.35)",
         "url": "https://vietnambiz.vn",
     },
+    "ssc": {
+        "id": "ssc",
+        "name": "UBCKNN (Cổng CBTT)",
+        "color": "#10b981",
+        "badge_bg": "rgba(16, 185, 129, 0.15)",
+        "badge_border": "rgba(16, 185, 129, 0.35)",
+        "url": "https://congbothongtin.ssc.gov.vn",
+    },
 }
 
 
